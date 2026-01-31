@@ -4,7 +4,7 @@ import { Wallet } from 'lucide-react';
 import { BillingWidget } from './BillingWidget';
 import { TransparencyService } from './TransparencyService';
 
-export const FinanceScreen = ({ user, showToast }) => {
+export const FinanceScreen = ({ resident, user, showToast }) => {
   const [tab, setTab] = useState('billing'); 
   return (
     <div className="p-6 pt-6 animate-fade-in select-none">
@@ -13,7 +13,7 @@ export const FinanceScreen = ({ user, showToast }) => {
          <button onClick={()=>setTab('billing')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all active:scale-95 ${tab==='billing'?'bg-white shadow-sm text-emerald-700':'text-gray-400 hover:text-gray-600'}`}>Tagihan Saya</button>
          <button onClick={()=>setTab('transparency')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all active:scale-95 ${tab==='transparency'?'bg-white shadow-sm text-emerald-700':'text-gray-400 hover:text-gray-600'}`}>Transparansi Kas</button>
        </div>
-       {tab === 'billing' ? <BillingWidget user={user} showToast={showToast} /> : <TransparencyService user={user} />}
+       {tab === 'billing' ? <BillingWidget resident={resident} showToast={showToast} /> : <TransparencyService user={user} />}
     </div>
   );
 };
