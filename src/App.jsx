@@ -41,8 +41,13 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [resident, setResident] = useState(null); // Real resident data from Firestore
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('last_active_tab') || 'home');
   const [profile, setProfile] = useState(null);
+
+  // Persist Active Tab
+  useEffect(() => {
+    localStorage.setItem('last_active_tab', activeTab);
+  }, [activeTab]);
   const [showIdCard, setShowIdCard] = useState(false);
   const [isLoginRequired, setIsLoginRequired] = useState(true);
   const [toast, setToast] = useState({ message: '', type: '' });
