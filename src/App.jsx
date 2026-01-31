@@ -82,19 +82,20 @@ export default function App() {
   // Login handler
   const handleUserLogin = async (residentData) => {
       try { 
-        // Ensure auth is active (idempotent if already signed in by LoginScreen)
-        const userCred = await signInAnonymously(auth);
-        const uid = userCred.user.uid;
+        // Auth is already handled by LoginScreen (Email/Password)
+        // We just need to sync state and Firestore
+        const uid = auth.currentUser?.uid || residentData.uid;
 
-        // SYNC 1: Copy resident data to user's private profile
-        await setDoc(doc(db, 'artifacts', APP_ID, 'users', uid, 'profile', 'main'), residentData);
-        
-        // SYNC 2: Link this UID back to the public resident document
-        // This allows Admin to find and delete this user data later
-        await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id), {
-            linkedUid: uid,
-            lastLoginAt: new Date().toISOString()
-        });
+        if (uid) {
+            // SYNC 1: Copy resident data to user's private profile
+            await setDoc(doc(db, 'artifacts', APP_ID, 'users', uid, 'profile', 'main'), residentData);
+            
+            // SYNC 2: Link this UID back to the public resident document
+            await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id), {
+                linkedUid: uid,
+                lastLoginAt: new Date().toISOString()
+            });
+        }
 
         setResident(residentData);
         setProfile(residentData);
@@ -103,7 +104,7 @@ export default function App() {
         showToast(`Selamat datang, ${residentData.name}!`, "success"); 
       } catch (e) { 
         console.error(e);
-        showToast("Gagal masuk sistem.", "error"); 
+        showToast("Gagal menyinkronkan data.", "error"); 
       }
   };
   
