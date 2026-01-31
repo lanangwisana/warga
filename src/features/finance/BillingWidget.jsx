@@ -5,36 +5,58 @@ import { collection, doc, onSnapshot, query, where, limit, getDocs, setDoc, upda
 import { db, APP_ID } from '../../config';
 import { PaymentModal } from './PaymentModal';
 
-export const BillingWidget = ({ user, showToast }) => {
+export const BillingWidget = ({ resident, showToast }) => {
   const [activeBill, setActiveBill] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
 
   useEffect(() => {
-      if(!user) return;
-      const q = query(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'bills'), where('status', '==', 'UNPAID'));
+      if(!resident) return;
+      // Query billings from public data linked to this resident
+      const q = query(
+          collection(db, 'artifacts', APP_ID, 'public', 'data', 'billings'), 
+          where('residentId', '==', resident.id),
+          where('status', '==', 'UNPAID')
+      );
+      
       const unsub = onSnapshot(q, (snapshot) => {
           if (snapshot.empty) {
-              const qPaid = query(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'bills'), where('status', '==', 'PAID'), limit(1));
+              setActiveBill(null);
+              // Check for history/paid bills if needed, or just leave empty
+              const qPaid = query(
+                  collection(db, 'artifacts', APP_ID, 'public', 'data', 'billings'), 
+                  where('residentId', '==', resident.id),
+                  where('status', '==', 'PAID'), 
+                  limit(1)
+              );
               getDocs(qPaid).then(snap => {
                   if(!snap.empty) setActiveBill({status: 'PAID'});
-                  else {
-                      const initialBill = { title: "IPL - Desember 2025", amount: 90000, status: 'UNPAID', dueDate: '2025-12-10', breakdown: [{ label: "Iuran Keamanan & Kebersihan (RW)", amount: 65000 }, { label: "Kas Operasional RT 06", amount: 25000 }] };
-                      setDoc(doc(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'bills')), initialBill);
-                  }
               });
           } else {
               const bills = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-              setActiveBill(bills[0]);
+              // Just take the first unpaid bill
+              // In real app, might want to sum them up or show list
+              const bill = bills[0];
+              
+              // Formatting for widget display if properties differ from Admin generation
+              // Admin generates: period, nominal, residentName, unit, status
+              // Widget expects: title, amount
+              setActiveBill({
+                  ...bill,
+                  title: `IPL - ${bill.period}`,
+                  amount: bill.nominal
+              });
           }
       }, (err) => console.error("Billing fetch error:", err));
       return () => unsub();
-  }, [user]);
+  }, [resident]);
 
   const handlePaymentSuccess = async () => {
       setShowPayment(false);
-      showToast("Pembayaran berhasil dikirim!", "success");
+      showToast("Pembayaran berhasil dikirim! Menunggu konfirmasi Admin.", "success");
       if (activeBill && activeBill.id) {
-          await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'bills', activeBill.id), { status: 'PAID' });
+          // In real implementation, this might trigger a 'payment request' instead of directly updating to PAID
+          // But for this prototype, if we want to simulate instant payment:
+          await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'billings', activeBill.id), { status: 'PAID', paidAt: new Date().toISOString() });
       }
   };
 

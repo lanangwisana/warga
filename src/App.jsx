@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Wallet, User, FilePlus, Users, Search, Bell, Loader2 } from 'lucide-react';
 import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 
 // Config
 import { auth, db, APP_ID, LOGO_URL } from './config';
@@ -39,6 +39,7 @@ const ConciergeWidget = () => {
 export default function App() {
   // State
   const [user, setUser] = useState(null);
+  const [resident, setResident] = useState(null); // Real resident data from Firestore
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [profile, setProfile] = useState(null);
@@ -63,19 +64,46 @@ export default function App() {
   // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (u) { setUser(u); setIsLoginRequired(false); }
+      if (u) { 
+        setUser(u);
+        const cachedResident = localStorage.getItem('resident_data');
+        if (cachedResident) {
+          const parsed = JSON.parse(cachedResident);
+          setResident(parsed);
+          setProfile(parsed);
+          setIsLoginRequired(false);
+        }
+      }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   // Login handler
-  const handleUserLogin = async (phone) => {
+  const handleUserLogin = async (residentData) => {
       try { 
-        await signInAnonymously(auth); 
-        showToast("Selamat datang kembali!", "success"); 
+        // Ensure auth is active (idempotent if already signed in by LoginScreen)
+        const userCred = await signInAnonymously(auth);
+        const uid = userCred.user.uid;
+
+        // SYNC 1: Copy resident data to user's private profile
+        await setDoc(doc(db, 'artifacts', APP_ID, 'users', uid, 'profile', 'main'), residentData);
+        
+        // SYNC 2: Link this UID back to the public resident document
+        // This allows Admin to find and delete this user data later
+        await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id), {
+            linkedUid: uid,
+            lastLoginAt: new Date().toISOString()
+        });
+
+        setResident(residentData);
+        setProfile(residentData);
+        localStorage.setItem('resident_data', JSON.stringify(residentData));
+        setIsLoginRequired(false);
+        showToast(`Selamat datang, ${residentData.name}!`, "success"); 
       } catch (e) { 
-        showToast("Gagal masuk.", "error"); 
+        console.error(e);
+        showToast("Gagal masuk sistem.", "error"); 
       }
   };
   
@@ -83,23 +111,12 @@ export default function App() {
   const handleLogout = async () => { 
     await signOut(auth); 
     setUser(null); 
+    setResident(null);
+    setProfile(null);
+    localStorage.removeItem('resident_data');
     setIsLoginRequired(true); 
     setActiveTab('home'); 
   };
-
-  // Profile listener
-  useEffect(() => {
-    if (!user || !db) return;
-    const unsub = onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), s => {
-       if(s.exists()) setProfile(s.data());
-       else {
-           const defaultProfile = { name: "Andi Agus Salim", job: "Dosen Telkom University", cluster: "Tahap 1", unit: "Adi Gladiol 18", status: "Warga Tetap" };
-           setDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), defaultProfile);
-           setProfile(defaultProfile);
-       }
-    });
-    return () => unsub();
-  }, [user]);
 
   // Loading state
   if (loading) return (
@@ -109,7 +126,7 @@ export default function App() {
   );
 
   // Login screen
-  if (!user || isLoginRequired) return <LoginScreen onLogin={handleUserLogin} showToast={showToast} />;
+  if (isLoginRequired) return <LoginScreen onLogin={handleUserLogin} showToast={showToast} />;
 
   // Main app
   return (
@@ -147,17 +164,17 @@ export default function App() {
        <div className="min-h-[100dvh] pb-24 max-w-lg mx-auto">
           {activeTab === 'home' && (
              <div className="p-5 pt-2 animate-fade-in space-y-2">
-                <DashboardHero profile={profile} onShowId={() => setShowIdCard(true)} />
-                <BillingWidget user={user} showToast={showToast} />
+                <DashboardHero profile={resident || profile} onShowId={() => setShowIdCard(true)} />
+                <BillingWidget resident={resident} showToast={showToast} />
                 <CompactIoT user={user} />
                 <NewsCarousel />
                 <RecentReports user={user} />
              </div>
           )}
-          {activeTab === 'finance' && <FinanceScreen user={user} showToast={showToast} />}
+          {activeTab === 'finance' && <FinanceScreen resident={resident} showToast={showToast} />}
           {activeTab === 'social' && <SocialScreen user={user} showToast={showToast} />}
-          {activeTab === 'report' && <ReportScreen user={user} profile={profile} showToast={showToast} />}
-          {activeTab === 'profile' && <ProfileScreen user={user} onLogout={handleLogout} showToast={showToast} />}
+          {activeTab === 'report' && <ReportScreen user={user} profile={resident || profile} showToast={showToast} />}
+          {activeTab === 'profile' && <ProfileScreen user={user} profile={resident || profile} onLogout={handleLogout} showToast={showToast} />}
        </div>
 
        {/* Bottom Navigation */}
