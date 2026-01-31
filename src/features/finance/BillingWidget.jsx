@@ -50,13 +50,17 @@ export const BillingWidget = ({ resident, showToast }) => {
       return () => unsub();
   }, [resident]);
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (paymentProofBase64) => {
       setShowPayment(false);
       showToast("Pembayaran berhasil dikirim! Menunggu konfirmasi Admin.", "success");
       if (activeBill && activeBill.id) {
-          // In real implementation, this might trigger a 'payment request' instead of directly updating to PAID
-          // But for this prototype, if we want to simulate instant payment:
-          await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'billings', activeBill.id), { status: 'PAID', paidAt: new Date().toISOString() });
+          // Update billing with payment proof and pending status
+          await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'billings', activeBill.id), { 
+              status: 'PENDING_VERIFICATION',
+              paymentProof: paymentProofBase64, // Base64 image
+              paymentMethod: 'transfer',
+              submittedAt: new Date().toISOString() 
+          });
       }
   };
 

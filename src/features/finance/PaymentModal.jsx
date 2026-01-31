@@ -1,21 +1,64 @@
 // Payment Modal Component
 import React, { useState } from 'react';
-import { ChevronRight, Upload, CheckCircle, Loader2 } from 'lucide-react';
+import { ChevronRight, Upload, CheckCircle, Loader2, X, Image as ImageIcon } from 'lucide-react';
 import { Modal } from '../../components';
+import { compressImage } from '../../utils';
 
 export const PaymentModal = ({ bill, onClose, onSuccess }) => {
     const [step, setStep] = useState(1); 
     const [method, setMethod] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [imagePreview, setImagePreview] = useState(null);
+    const [imageBase64, setImageBase64] = useState(null);
 
     const methods = [
         { id: 'bca', name: 'Transfer BCA', icon: '🏦', acc: '123-456-7890 a.n Bendahara RW' },
         { id: 'qris', name: 'QRIS Scan', icon: '📱', acc: 'Scan Code' },
     ];
 
-    const handleUpload = () => {
+    const handleFileSelect = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Mohon pilih file gambar (JPG, PNG)');
+            return;
+        }
+        
+        // Validate file size (max 10MB before compression)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Ukuran file maksimal 10MB');
+            return;
+        }
+        
         setIsUploading(true);
-        setTimeout(() => { setIsUploading(false); setStep(3); }, 2000);
+        try {
+            // Compress and convert to Base64
+            const base64 = await compressImage(file);
+            setImageBase64(base64);
+            setImagePreview(base64);
+            setIsUploading(false);
+        } catch (error) {
+            console.error('Image compression error:', error);
+            alert('Gagal memproses gambar');
+            setIsUploading(false);
+        }
+    };
+
+    const handleConfirmPayment = () => {
+        if (!imageBase64) {
+            alert('Mohon upload bukti transfer terlebih dahulu');
+            return;
+        }
+        // Pass the image data back to parent for saving
+        onSuccess(imageBase64);
+        setStep(3);
+    };
+
+    const removeImage = () => {
+        setImagePreview(null);
+        setImageBase64(null);
     };
 
     return (
@@ -51,20 +94,59 @@ export const PaymentModal = ({ bill, onClose, onSuccess }) => {
                 </div>
             )}
             {step === 2 && (
-                <div className="animate-fade-in text-center">
-                    <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-dashed border-gray-300">
+                <div className="animate-fade-in">
+                    <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-dashed border-gray-300 text-center">
                         <p className="text-xs text-gray-500 mb-1">Silakan transfer ke:</p>
                         <p className="font-bold text-emerald-600 text-lg">{method.name}</p>
                         <p className="font-mono text-gray-800 text-base mt-1 select-all">{method.acc}</p>
                         <p className="text-xs text-gray-500 mt-2">Nominal: <span className="font-bold text-gray-900">Rp {bill.amount.toLocaleString()}</span></p>
                     </div>
-                    <label className="block w-full cursor-pointer">
-                        <div className="w-full h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 hover:bg-gray-100 transition-colors">
-                            {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-emerald-600"/> : <Upload className="w-6 h-6 text-gray-400"/>}
-                            <span className="text-xs font-bold text-gray-500">{isUploading ? 'Mengunggah...' : 'Upload Bukti Transfer'}</span>
+                    
+                    {/* Image Preview */}
+                    {imagePreview ? (
+                        <div className="relative mb-4">
+                            <img src={imagePreview} alt="Bukti Transfer" className="w-full h-48 object-cover rounded-2xl border-2 border-emerald-500"/>
+                            <button 
+                                onClick={removeImage} 
+                                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"
+                            >
+                                <X className="w-4 h-4"/>
+                            </button>
+                            <div className="absolute bottom-2 left-2 bg-emerald-500 text-white px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3"/> Gambar Siap
+                            </div>
                         </div>
-                        <input type="file" className="hidden" onChange={handleUpload} disabled={isUploading}/>
-                    </label>
+                    ) : (
+                        <label className="block w-full cursor-pointer mb-4">
+                            <div className="w-full h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 hover:bg-gray-100 hover:border-emerald-400 transition-colors">
+                                {isUploading ? (
+                                    <>
+                                        <Loader2 className="w-6 h-6 animate-spin text-emerald-600"/>
+                                        <span className="text-xs font-bold text-emerald-600">Memproses gambar...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload className="w-6 h-6 text-gray-400"/>
+                                        <span className="text-xs font-bold text-gray-500">Upload Bukti Transfer</span>
+                                        <span className="text-[10px] text-gray-400">JPG, PNG (max 10MB)</span>
+                                    </>
+                                )}
+                            </div>
+                            <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={isUploading}/>
+                        </label>
+                    )}
+                    
+                    <button 
+                        onClick={handleConfirmPayment} 
+                        disabled={!imageBase64}
+                        className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-lg transition-all active:scale-95 ${
+                            imageBase64 
+                                ? 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700' 
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                    >
+                        KONFIRMASI PEMBAYARAN
+                    </button>
                 </div>
             )}
             {step === 3 && (
@@ -72,7 +154,7 @@ export const PaymentModal = ({ bill, onClose, onSuccess }) => {
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce"><CheckCircle className="w-10 h-10 text-green-600"/></div>
                     <h3 className="font-bold text-xl text-gray-900 mb-2">Pembayaran Berhasil!</h3>
                     <p className="text-sm text-gray-500 mb-6">Bukti transfer Anda telah dikirim dan sedang diverifikasi oleh admin.</p>
-                    <button onClick={onSuccess} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 active:scale-95 transition-transform">Selesai</button>
+                    <button onClick={onClose} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 active:scale-95 transition-transform">Selesai</button>
                 </div>
             )}
         </Modal>
