@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { User, Home, Lock, Phone, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { LOGO_URL, db, auth, APP_ID } from '../../config';
 import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
 export const LoginScreen = ({ onLogin, showToast }) => {
   const [mode, setMode] = useState('check_phone'); // check_phone, input_password, input_pin, setup_password
@@ -56,13 +56,59 @@ export const LoginScreen = ({ onLogin, showToast }) => {
     }
   };
 
-  // Verify Password
-  const verifyPassword = (e) => {
+  // Helper: Convert Phone to System Email
+  const getSystemEmail = (phoneNum) => {
+      // Remove '0', '+62', etc to standard format if needed, but simple append works for consistency if input is validated
+      return `${phoneNum.replace(/\D/g,'')}@warga.bumiadipura.id`;
+  };
+
+  // Verify Password & Login
+  const verifyPassword = async (e) => {
     e.preventDefault();
-    if (password === residentData.password) {
-      onLogin(residentData);
-    } else {
-      showToast("Password salah.", "error");
+    setIsLoading(true);
+    
+    const email = getSystemEmail(phone); // Use phone state or residentData.phone
+
+    try {
+        // 1. Try to login to Firebase Auth
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        
+        // 2. Success - Link UID if missing
+        if (!residentData.linkedUid) {
+             await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id), {
+                 linkedUid: userCredential.user.uid
+             });
+        }
+
+        onLogin({ ...residentData, uid: userCredential.user.uid });
+
+    } catch (error) {
+        console.log("Auth Error:", error.code);
+        
+        // MIGRATION LOGIC: 
+        // If user not found in Auth but password matches Firestore data (Legacy User)
+        // We create the Auth account for them now.
+        if ((error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') && password === residentData.password) {
+             try {
+                 const newUser = await createUserWithEmailAndPassword(auth, email, password);
+                 
+                 // Save stable UID
+                 await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id), {
+                     linkedUid: newUser.user.uid
+                 });
+
+                 showToast("Akun berhasil dimigrasi ke sistem baru.", "success");
+                 onLogin({ ...residentData, uid: newUser.user.uid });
+                 return;
+             } catch (regError) {
+                 console.error(regError);
+                 showToast("Gagal migrasi akun: " + regError.message, "error");
+             }
+        } else {
+             showToast("Password salah atau akun bermasalah.", "error");
+        }
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -93,27 +139,33 @@ export const LoginScreen = ({ onLogin, showToast }) => {
 
     setIsLoading(true);
     try {
-      // CRITICAL FIX: Must sign in first to have permission to update Firestore
-      if (!auth.currentUser) {
-          await signInAnonymously(auth);
-      }
+      const email = getSystemEmail(phone); // Use phone from state
 
-      // Update password in Firestore
+      // 1. Create User in Firebase Auth (Stable UID)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const newUid = userCredential.user.uid;
+
+      // 2. Update password & UID in Firestore
       const residentRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id);
       await updateDoc(residentRef, {
-        password: password,
-        isProfileCompleted: true // Flag that they have set up account
+        password: password, // Still keeping for redundancy/legacy, optional
+        linkedUid: newUid,  // Link to Auth
+        isProfileCompleted: true
       });
       
       showToast("Password berhasil dibuat!", "success");
       
       // Auto login
-      const updatedResident = { ...residentData, password: password, isProfileCompleted: true };
-      onLogin(updatedResident);
+      onLogin({ ...residentData, password, isProfileCompleted: true, uid: newUid });
       
     } catch (err) {
       console.error("Setup Password Error:", err);
-      showToast("Gagal menyimpan password. Coba lagi.", "error");
+      if (err.code === 'auth/email-already-in-use') {
+          showToast("Nomor ini sudah terdaftar. Silakan login.", "error");
+          setMode('input_password');
+      } else {
+          showToast("Gagal membuat akun: " + err.message, "error");
+      }
     } finally {
       setIsLoading(false);
     }
