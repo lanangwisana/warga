@@ -1,1 +1,1 @@
-export { callGeminiAPI, getTimeGreeting } from './helpers';
+export { callGeminiAPI, getTimeGreeting, compressImage } from './helpers';
