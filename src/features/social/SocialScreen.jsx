@@ -1,6 +1,6 @@
 // Social Screen Component
 import React, { useState, useEffect } from 'react';
-import { Users, MapPin, Sparkles, ChevronRight, Loader2, ThumbsUp, MessageCircle, Send } from 'lucide-react';
+import { Users, MapPin, Sparkles, ChevronRight, Loader2, ThumbsUp, MessageCircle, Send, Clock } from 'lucide-react';
 import { collection, onSnapshot, addDoc, query, orderBy } from 'firebase/firestore';
 import { db, APP_ID } from '../../config';
 import { callGeminiAPI } from '../../utils';
@@ -127,7 +127,16 @@ export const SocialScreen = ({ user, resident, showToast }) => {
                                 </div>
                             );
                         })()}
-                        <div><span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">{ev.category}</span><h4 className="font-bold text-gray-900 mt-1.5">{ev.title}</h4><p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3"/> {ev.location}</p></div>
+                        <div className="flex-1 overflow-hidden">
+                            <span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">{ev.category}</span>
+                            <h4 className="font-bold text-gray-900 mt-1.5 line-clamp-1">{ev.title}</h4>
+                            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 mt-1 text-xs text-gray-500">
+                                <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {ev.location}</span>
+                                <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3"/> {ev.time ? ev.time : 'Waktu Menyesuaikan'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>
