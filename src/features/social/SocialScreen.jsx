@@ -18,17 +18,7 @@ export const SocialScreen = ({ user, showToast }) => {
   useEffect(() => {
     if (!db) return;
     const unsub = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'events'), (s) => {
-        if(s.empty) {
-            const seedEvents = [
-                { title: 'Posyandu Balita', date: '15 Des', location: 'Balai RW', category: 'Kesehatan', type: 'event' },
-                { title: 'Pengajian Masjid Al Kahfi', date: '20 Des', location: 'Masjid Al Kahfi', category: 'Keagamaan', type: 'event' },
-                { title: 'Kerja Bakti Akbar', date: '25 Des', location: 'Lingkungan RT 06', category: 'Lingkungan', type: 'event' },
-                { title: 'Lomba 17 Agustusan', date: '17 Agu', location: 'Lapangan Utama', category: 'Hiburan', type: 'event' }
-            ];
-            seedEvents.forEach(e => addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'events'), e));
-        } else {
-            setEvents(s.docs.map(d => ({id:d.id, ...d.data()})));
-        }
+        setEvents(s.docs.map(d => ({id:d.id, ...d.data()})));
     }, (err) => console.error("Events fetch error:", err));
     return () => unsub();
   }, []);
