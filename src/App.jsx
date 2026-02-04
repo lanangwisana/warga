@@ -206,12 +206,12 @@ export default function App() {
                 <DashboardHero profile={resident || profile} onShowId={() => setShowIdCard(true)} />
                 <BillingWidget resident={resident} showToast={showToast} />
                 <CompactIoT user={user} />
-                <NewsCarousel />
+                <NewsCarousel resident={resident} />
                 <RecentReports user={user} />
              </div>
           )}
           {activeTab === 'finance' && <FinanceScreen resident={resident} showToast={showToast} />}
-          {activeTab === 'social' && <SocialScreen user={user} showToast={showToast} />}
+          {activeTab === 'social' && <SocialScreen user={user} resident={resident} showToast={showToast} />}
           {activeTab === 'report' && <ReportScreen user={user} profile={resident || profile} showToast={showToast} />}
           {activeTab === 'profile' && <ProfileScreen user={user} profile={resident || profile} onLogout={handleLogout} showToast={showToast} setIsNavBlocked={setIsNavBlocked} />}
        </div>
