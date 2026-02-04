@@ -206,7 +206,7 @@ export default function App() {
                 <DashboardHero profile={resident || profile} onShowId={() => setShowIdCard(true)} />
                 <BillingWidget resident={resident} showToast={showToast} />
                 <CompactIoT user={user} />
-                <NewsCarousel />
+                <NewsCarousel resident={resident} />
                 <RecentReports user={user} />
              </div>
           )}
