@@ -5,7 +5,7 @@ import { collection, onSnapshot, addDoc, query, orderBy } from 'firebase/firesto
 import { db, APP_ID } from '../../config';
 import { callGeminiAPI } from '../../utils';
 
-export const SocialScreen = ({ user, showToast }) => {
+export const SocialScreen = ({ user, resident, showToast }) => {
   const [tab, setTab] = useState('events');
   const [showEventGen, setShowEventGen] = useState(false);
   const [eventTheme, setEventTheme] = useState('');
@@ -43,10 +43,20 @@ export const SocialScreen = ({ user, showToast }) => {
   useEffect(() => {
     if (!db) return;
     const unsub = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'events'), (s) => {
-        setEvents(s.docs.map(d => ({id:d.id, ...d.data()})));
+        let allEvents = s.docs.map(d => ({id:d.id, ...d.data()}));
+        
+        // FILTER: Warga hanya bisa melihat event RW (Global) atau RT-nya sendiri
+        if (resident?.rt) {
+            const myRt = `RT${resident.rt.toString().padStart(2, '0')}`;
+            allEvents = allEvents.filter(ev => 
+                ev.createdBy === 'RW' || ev.createdBy === myRt
+            );
+        }
+        
+        setEvents(allEvents);
     }, (err) => console.error("Events fetch error:", err));
     return () => unsub();
-  }, []);
+  }, [resident]);
 
   useEffect(() => {
       const unsub = onSnapshot(query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'posts'), orderBy('createdAt', 'desc')), (s) => {
