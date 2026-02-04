@@ -15,6 +15,31 @@ export const SocialScreen = ({ user, showToast }) => {
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState('');
 
+  // Helper: Get Month and Day from ISO String or format '15 Des'
+  const getEventDateParts = (dateStr) => {
+    if (!dateStr) return { day: '01', month: 'BULAN' };
+    
+    // Check if it's already in '15 Des' format (old seed data)
+    if (dateStr.includes(' ') && !dateStr.includes('T')) {
+      const parts = dateStr.split(' ');
+      return { day: parts[0], month: parts[1] };
+    }
+
+    // Handle ISO String with local timezone
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return { day: '??', month: '??' };
+      
+      const day = d.getDate().toString().padStart(2, '0');
+      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+      const month = months[d.getMonth()];
+      
+      return { day, month };
+    } catch (e) {
+      return { day: '??', month: '??' };
+    }
+  };
+
   useEffect(() => {
     if (!db) return;
     const unsub = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'events'), (s) => {
@@ -83,7 +108,15 @@ export const SocialScreen = ({ user, showToast }) => {
             <div className="space-y-3">
                 {events.map(ev => (
                     <div key={ev.id} className="bg-white p-4 rounded-[20px] border border-gray-100 shadow-sm flex items-center gap-4 active:bg-gray-50 transition-colors active:scale-[0.99]">
-                        <div className="bg-emerald-50 p-3.5 rounded-2xl text-center min-w-[65px]"><p className="text-[10px] font-bold text-emerald-600 uppercase mb-0.5">{ev.date.split(' ')[1] || 'BULAN'}</p><p className="text-2xl font-black text-emerald-800 leading-none">{ev.date.split(' ')[0] || '01'}</p></div>
+                        {(() => {
+                            const { day, month } = getEventDateParts(ev.date);
+                            return (
+                                <div className="bg-emerald-50 p-3.5 rounded-2xl text-center min-w-[65px]">
+                                    <p className="text-[10px] font-bold text-emerald-600 uppercase mb-0.5">{month}</p>
+                                    <p className="text-2xl font-black text-emerald-800 leading-none">{day}</p>
+                                </div>
+                            );
+                        })()}
                         <div><span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">{ev.category}</span><h4 className="font-bold text-gray-900 mt-1.5">{ev.title}</h4><p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3"/> {ev.location}</p></div>
                     </div>
                 ))}
