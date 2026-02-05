@@ -37,7 +37,11 @@ export const DashboardHero = ({ profile, onShowId }) => {
                     </div>
                     
                     <div onClick={onShowId} className="w-16 h-16 rounded-[20px] bg-white/10 p-1 backdrop-blur-sm border border-white/20 shadow-lg cursor-pointer active:scale-90 transition-transform hover:rotate-3">
-                        <img src={USER_PHOTO_URL} className="w-full h-full object-cover rounded-2xl" alt="Profile" />
+                        <div className="w-full h-full rounded-2xl bg-emerald-800 flex items-center justify-center border border-white/20">
+                            <span className="text-2xl font-bold text-white">
+                                {(profile?.name || 'W').charAt(0).toUpperCase()}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
