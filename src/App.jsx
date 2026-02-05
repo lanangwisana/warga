@@ -92,6 +92,23 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Real-time Profile Sync
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsub = onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), (docSnap) => {
+        if (docSnap.exists()) {
+            const newData = docSnap.data();
+            console.log("Global sync: Profile updated", newData.name);
+            setResident(newData);
+            setProfile(newData);
+            localStorage.setItem('resident_data', JSON.stringify(newData));
+        }
+    });
+
+    return () => unsub();
+  }, [user?.uid]);
+
   // Login handler
   const handleUserLogin = async (residentData) => {
       try { 
