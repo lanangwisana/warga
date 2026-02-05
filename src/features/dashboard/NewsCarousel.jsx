@@ -5,7 +5,7 @@ import { collection, onSnapshot, addDoc, query, orderBy } from 'firebase/firesto
 import { db, APP_ID, DEFAULT_EVENT_IMAGE } from '../../config';
 import { Modal } from '../../components';
 
-export const NewsCarousel = ({ resident }) => {
+export const NewsCarousel = ({ resident, onNavigate }) => {
   const [items, setItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
 
@@ -71,7 +71,7 @@ export const NewsCarousel = ({ resident }) => {
     <div className="mb-6 select-none">
       <div className="flex justify-between items-center mb-3 px-1">
         <h3 className="font-bold text-gray-900 text-sm">Kegiatan Mendatang</h3>
-        <button className="text-xs text-emerald-600 font-bold hover:underline active:text-emerald-800 transition-colors">Lihat Semua</button>
+        <button onClick={() => onNavigate && onNavigate('social')} className="text-xs text-emerald-600 font-bold hover:underline active:text-emerald-800 transition-colors">Lihat Semua</button>
       </div>
       
       <div className="flex gap-4 overflow-x-auto pb-4 px-1 no-scrollbar snap-x touch-pan-x">
