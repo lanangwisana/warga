@@ -5,10 +5,12 @@ import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db, APP_ID, LOGO_URL, USER_PHOTO_URL } from '../../config';
 
 export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) => {
+    const [editData, setEditData] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [profileData, setProfileData] = useState({});
     const [showSingleConfirm, setShowSingleConfirm] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState({ show: false, index: null });
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [tempFamily, setTempFamily] = useState({ name: '', relation: 'Anak' });
     const [customJob, setCustomJob] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -41,24 +43,35 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                 console.log("Received profile update from DB");
                 setProfileData(s.data());
             } else {
-                const defaultProfile = { name: "Warga Baru", job: "-", unit: "-", status: "Warga Tetap", family: [] };
-                setDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), defaultProfile);
-                setProfileData(defaultProfile);
+                // DATA HILANG / DIHAPUS ADMIN -> Auto Logout
+                console.warn("Profile data missing! Logging out...");
+                onLogout();
             }
         }, (err) => console.error(err));
         return () => unsub();
-    }, [user?.uid]);
+    }, [user?.uid, onLogout]);
+
+    const handleStartEdit = () => {
+        setEditData({ ...profileData });
+        setIsEditing(true);
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setEditData(null);
+    };
 
     const handleSaveProfile = async () => {
+        if (!editData) return;
         setIsSaving(true);
         // Handle custom job logic
-        let finalJob = profileData.job;
-        if (profileData.job === '_CUSTOM_') {
+        let finalJob = editData.job;
+        if (editData.job === '_CUSTOM_') {
             finalJob = customJob.trim() || '-';
         }
 
         // Handle pending family member (Auto-add if user forgot to click +)
-        let finalFamily = Array.isArray(profileData.family) ? [...profileData.family] : [];
+        let finalFamily = Array.isArray(editData.family) ? [...editData.family] : [];
         if (tempFamily.name && tempFamily.name.trim() !== '') {
             finalFamily.push(tempFamily);
         }
@@ -66,7 +79,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
         try {
             // 1. Update Private Profile (Local)
             const payload = {
-                ...profileData,
+                ...editData,
                 job: finalJob,
                 family: finalFamily,
                 updatedAt: new Date().toISOString()
@@ -77,25 +90,26 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
             await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), payload);
 
             // 2. Sync to Public Data (Admin) - IF resident ID exists
-            // We use profileData.id which should have been brought over during login/sync
-            if (profileData.id) {
-                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', profileData.id), {
-                    name: profileData.name,
+            // We use editData.id (preserved from profileData)
+            if (editData.id) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', editData.id), {
+                    name: editData.name,
                     job: finalJob,
-                    phone: profileData.phone || '',
-                    isSingle: profileData.isSingle || false,
+                    phone: editData.phone || '',
+                    isSingle: editData.isSingle || false,
                     family: finalFamily,
                     updatedBy: 'USER_SYNC',
                     lastSyncAt: new Date().toISOString()
                 });
-                console.log("Synced to public resident data:", profileData.id);
+                console.log("Synced to public resident data:", editData.id);
             }
 
-            // Update local state to reflect changes
-            setProfileData(prev => ({ ...prev, job: finalJob, family: finalFamily }));
+            // Update local state to reflect changes (Optimistic)
+            setProfileData(payload);
             setTempFamily({ name: '', relation: 'Anak' });
             
             setIsEditing(false);
+            setEditData(null);
             showToast("Profil berhasil diperbarui & disinkronkan!", "success");
         } catch (error) {
             console.error(error);
@@ -106,7 +120,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
 
     const addFamilyMember = () => {
         if(!tempFamily.name) return;
-        setProfileData(prev => {
+        setEditData(prev => {
             const currentFamily = Array.isArray(prev.family) ? prev.family : [];
             return { ...prev, family: [...currentFamily, tempFamily] };
         });
@@ -117,42 +131,19 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
         setDeleteConfirm({ show: true, index: idx });
     };
 
-    const confirmDeleteFamilyMember = async () => {
-        setIsSaving(true);
-        try {
-            const currentFamily = Array.isArray(profileData.family) ? profileData.family : [];
+    const confirmDeleteFamilyMember = () => {
+        // Just update draft state, no DB write yet
+        if (editData) {
+            const currentFamily = Array.isArray(editData.family) ? editData.family : [];
             const newFamily = currentFamily.filter((_, i) => i !== deleteConfirm.index);
-            
-            // 1. Update Private Data
-            await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), {
-                ...profileData,
-                family: newFamily,
-                updatedAt: new Date().toISOString()
-            });
-
-            // 2. Update Public Data
-            if (profileData.id) {
-                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', profileData.id), {
-                    family: newFamily,
-                    updatedBy: 'USER_DELETE_FAMILY',
-                    lastSyncAt: new Date().toISOString()
-                });
-            }
-
-            // 3. Update Local State
-            setProfileData(prev => ({ ...prev, family: newFamily }));
+            setEditData({ ...editData, family: newFamily });
             setDeleteConfirm({ show: false, index: null });
-            showToast("Anggota keluarga berhasil dihapus.", "success");
-
-        } catch (error) {
-            console.error("Delete failed:", error);
-            showToast("Gagal menghapus data.", "error");
         }
-        setIsSaving(false);
     };
 
     const getFamilyList = () => {
-        return Array.isArray(profileData.family) ? profileData.family : [];
+        const sourceFn = isEditing && editData ? editData : profileData;
+        return Array.isArray(sourceFn.family) ? sourceFn.family : [];
     };
 
     const jobOptions = [
@@ -165,7 +156,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
         <div className="p-5 pt-6 animate-fade-in pb-24">
             <div className="flex justify-between items-start mb-6">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 tracking-tight"><User className="text-emerald-600 fill-emerald-100"/> Profil Warga</h2>
-                <button onClick={onLogout} className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg flex items-center gap-1 active:scale-95 transition-transform hover:bg-red-100"><LogOut className="w-3.5 h-3.5"/> Keluar</button>
+                <button onClick={() => setShowLogoutConfirm(true)} className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg flex items-center gap-1 active:scale-95 transition-transform hover:bg-red-100"><LogOut className="w-3.5 h-3.5"/> Keluar</button>
             </div>
             
             {/* ID Card */}
@@ -187,7 +178,11 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
 
                     <div className="flex-1 flex items-center gap-5 mt-2 pl-1">
                         <div className="relative w-[88px] h-[88px] rounded-full p-1 bg-gradient-to-tr from-emerald-400 to-teal-500 shadow-xl">
-                            <img src={USER_PHOTO_URL} className="w-full h-full rounded-full object-cover border-[3px] border-[#203A43]" alt="Profile" />
+                            <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center border-[3px] border-[#203A43]">
+                                <span className="text-3xl font-bold text-white">
+                                    {(isEditing && editData?.name ? editData.name : profileData.name || 'W').charAt(0).toUpperCase()}
+                                </span>
+                            </div>
                             <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-[3px] border-[#203A43] rounded-full flex items-center justify-center shadow-sm">
                                 <BadgeCheck className="w-3.5 h-3.5 text-white" />
                             </div>
@@ -219,26 +214,29 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
             <div className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 mb-6">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-900 text-sm">Data Diri & Pengaturan</h3>
-                    <button onClick={()=>setIsEditing(!isEditing)} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg active:scale-95 transition-all">
+                    <button 
+                        onClick={isEditing ? handleCancelEdit : handleStartEdit} 
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all ${isEditing ? 'text-red-600 bg-red-50' : 'text-emerald-600 bg-emerald-50'}`}
+                    >
                         {isEditing ? 'Batal' : 'Edit Data'}
                     </button>
                 </div>
-                {isEditing ? (
+                {isEditing && editData ? (
                     <div className="w-full space-y-4 mt-2 animate-fade-in">
                         {/* Editable Fields */}
-                        <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Nama Lengkap</label><input className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none" value={profileData.name||''} onChange={e=>setProfileData({...profileData, name:e.target.value})}/></div>
+                        <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Nama Lengkap</label><input className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none" value={editData.name||''} onChange={e=>setEditData({...editData, name:e.target.value})}/></div>
                         
                         <div>
                             <label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Pekerjaan</label>
                             <select 
                                 className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none"
-                                value={jobOptions.includes(profileData.job) ? profileData.job : '_CUSTOM_'}
+                                value={jobOptions.includes(editData.job) ? editData.job : '_CUSTOM_'}
                                 onChange={(e) => {
                                     const val = e.target.value;
                                     if (val === '_CUSTOM_') {
-                                        setProfileData({...profileData, job: '_CUSTOM_'});
+                                        setEditData({...editData, job: '_CUSTOM_'});
                                     } else {
-                                        setProfileData({...profileData, job: val});
+                                        setEditData({...editData, job: val});
                                     }
                                 }}
                             >
@@ -247,26 +245,26 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                                     <option key={opt} value={opt === 'Lainnya' ? '_CUSTOM_' : opt}>{opt}</option>
                                 ))}
                             </select>
-                            {(profileData.job === '_CUSTOM_' || (!jobOptions.includes(profileData.job) && !['', '-'].includes(profileData.job))) && (
+                            {(editData.job === '_CUSTOM_' || (!jobOptions.includes(editData.job) && !['', '-'].includes(editData.job))) && (
                                 <input 
                                     className="w-full bg-gray-50 p-3 rounded-xl text-sm mt-2 border border-emerald-200 outline-none" 
                                     placeholder="Tulis pekerjaan..."
-                                    value={profileData.job === '_CUSTOM_' ? customJob : (jobOptions.includes(profileData.job) ? '' : profileData.job)}
+                                    value={editData.job === '_CUSTOM_' ? customJob : (jobOptions.includes(editData.job) ? '' : editData.job)}
                                     onChange={e => {
                                         setCustomJob(e.target.value);
-                                        setProfileData({...profileData, job: '_CUSTOM_'});
+                                        setEditData({...editData, job: '_CUSTOM_'});
                                     }}
                                 />
                             )}
                         </div>
                         
-                        <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">No. WhatsApp</label><input className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none" placeholder="08..." value={profileData.phone||''} onChange={e=>setProfileData({...profileData, phone:e.target.value})}/></div>
+                        <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">No. WhatsApp</label><input className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none" placeholder="08..." value={editData.phone||''} onChange={e=>setEditData({...editData, phone:e.target.value})}/></div>
 
                         {/* Read Only Fields (Locked) */}
                         <div className="p-3 bg-red-50 rounded-xl border border-red-100">
                              <p className="text-[10px] font-bold text-red-400 uppercase mb-2 flex items-center gap-1"><Shield className="w-3 h-3"/> Data Terkunci (Hubungi RT)</p>
                              <div className="opacity-70">
-                                <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Unit / Blok</label><input disabled className="w-full bg-white p-2 rounded-lg text-sm font-bold border border-gray-200" value={profileData.unit||''} /></div>
+                                <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Unit / Blok</label><input disabled className="w-full bg-white p-2 rounded-lg text-sm font-bold border border-gray-200" value={editData.unit||''} /></div>
                              </div>
                         </div>
 
@@ -274,13 +272,13 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                         <div className="flex items-center gap-3 py-2 bg-gray-50 p-3 rounded-xl">
                             <input 
                                 type="checkbox" 
-                                checked={profileData.isSingle || false} 
+                                checked={editData.isSingle || false} 
                                 onChange={(e) => {
                                     const isChecked = e.target.checked;
-                                    if (isChecked && profileData.family && profileData.family.length > 0) {
+                                    if (isChecked && editData.family && editData.family.length > 0) {
                                         setShowSingleConfirm(true);
                                     } else {
-                                        setProfileData({ ...profileData, isSingle: isChecked });
+                                        setEditData({ ...editData, isSingle: isChecked });
                                     }
                                 }} 
                                 className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500" 
@@ -289,7 +287,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                         </div>
 
                         {/* Family Section */}
-                        {(!profileData.isSingle) && (
+                        {(!editData.isSingle) && (
                             <div className="bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
                                 <label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-2">Anggota Keluarga</label>
                                 
@@ -361,7 +359,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                             </button>
                             <button 
                                 onClick={() => {
-                                    setProfileData({ ...profileData, isSingle: true, family: [] });
+                                    setEditData({ ...editData, isSingle: true, family: [] });
                                     setShowSingleConfirm(false);
                                 }}
                                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
@@ -396,6 +394,35 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
                             >
                                 Hapus
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Modal for Logout Confirmation */}
+            {showLogoutConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl scale-100 animate-scale-in">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                            <LogOut className="w-6 h-6 text-red-500"/>
+                        </div>
+                        <h3 className="text-lg font-bold text-center text-gray-900 mb-2">Konfirmasi Keluar</h3>
+                        <p className="text-center text-gray-500 text-sm mb-6">
+                            Apakah Anda yakin ingin keluar dari aplikasi?
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setShowLogoutConfirm(false)}
+                                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                onClick={onLogout}
+                                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
+                            >
+                                Ya, Keluar
                             </button>
                         </div>
                     </div>

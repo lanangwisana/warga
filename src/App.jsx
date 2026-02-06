@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, Wallet, User, FilePlus, Users, Search, Bell, Loader2, AlertTriangle } from 'lucide-react';
 import { onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, collection, query, orderBy } from 'firebase/firestore';
 //tes
 // Config
 import { auth, db, APP_ID, LOGO_URL } from './config';
@@ -22,7 +22,8 @@ import {
   SocialScreen,
   ReportScreen,
   ProfileScreen,
-  IdCardModal
+  IdCardModal,
+  NotificationModal
 } from './features';
 
 // Concierge Widget
@@ -56,6 +57,58 @@ export default function App() {
   const [isNavBlocked, setIsNavBlocked] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Monitor Notifications & Unread Count
+  useEffect(() => {
+    if (!resident || !db) return;
+
+    const unsub = onSnapshot(query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'news'), orderBy('createdAt', 'desc')), (s) => {
+        let allNews = s.docs.map(d => ({id:d.id, ...d.data()}));
+        
+        // Filter by RT/RW access
+        const myRt = resident.rt ? `RT${resident.rt.toString().padStart(2, '0')}` : null;
+        allNews = allNews.filter(n => n.createdBy === 'RW' || (myRt && n.createdBy === myRt));
+
+        // Get last read timestamp from resident data (Firestore)
+        const lastRead = resident?.lastReadNewsTime || '0';
+        const unread = allNews.filter(n => n.createdAt > lastRead);
+        
+        setUnreadCount(unread.length);
+
+        // Auto-open if there are unread notifications (once per session)
+        const hasAutoOpened = sessionStorage.getItem('notif_auto_opened');
+        if (unread.length > 0 && !hasAutoOpened) {
+            setShowNotifications(true);
+            sessionStorage.setItem('notif_auto_opened', 'true');
+        }
+    });
+
+    return () => unsub();
+  }, [resident]);
+
+  // Handle open notifications manually
+  const handleOpenNotifications = async () => {
+    setShowNotifications(true);
+    
+    // Mark as read in DB if there are unread items
+    if (unreadCount > 0 && resident?.id) {
+        try {
+            // We'll use a slightly delayed update to allow the modal to open smoothly
+            const latestNewsQuery = query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'news'), orderBy('createdAt', 'desc'));
+            // Just get the absolute latest broadcast time to mark as read point
+            const nowIso = new Date().toISOString();
+            await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', resident.id), {
+                lastReadNewsTime: nowIso
+            });
+            // Update local state to reflect change immediately
+            setResident(prev => ({ ...prev, lastReadNewsTime: nowIso }));
+        } catch (e) {
+            console.error("Failed to mark notifications as read:", e);
+        }
+    }
+  };
 
   // Navigation handler with blocker
   const handleTabChange = (tabId) => {
@@ -96,6 +149,23 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Real-time Profile Sync
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsub = onSnapshot(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), (docSnap) => {
+        if (docSnap.exists()) {
+            const newData = docSnap.data();
+            console.log("Global sync: Profile updated", newData.name);
+            setResident(newData);
+            setProfile(newData);
+            localStorage.setItem('resident_data', JSON.stringify(newData));
+        }
+    });
+
+    return () => unsub();
+  }, [user?.uid]);
 
   // Login handler
   const handleUserLogin = async (residentData) => {
@@ -185,9 +255,13 @@ export default function App() {
                 <button onClick={() => setIsSearchOpen(!isSearchOpen)} className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-500 transition-colors active:scale-95">
                     <Search className="w-5 h-5" />
                 </button>
-                <button onClick={() => showToast("Tidak ada notifikasi baru.", "info")} className="relative p-2.5 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-500 transition-colors active:scale-95">
+                <button onClick={handleOpenNotifications} className="relative p-2.5 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-500 transition-colors active:scale-95">
                     <Bell className="w-5 h-5" />
-                    <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white ring-1 ring-white"></span>
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white text-[10px] font-black text-white flex items-center justify-center animate-bounce-in shadow-sm shadow-red-200">
+                            !
+                        </span>
+                    )}
                 </button>
             </div>
         </div>
@@ -206,7 +280,7 @@ export default function App() {
                 <DashboardHero profile={resident || profile} onShowId={() => setShowIdCard(true)} />
                 <BillingWidget resident={resident} showToast={showToast} />
                 <CompactIoT user={user} />
-                <NewsCarousel resident={resident} />
+                <NewsCarousel resident={resident} onNavigate={handleTabChange} />
                 <RecentReports user={user} />
              </div>
           )}
@@ -227,6 +301,7 @@ export default function App() {
 
        {/* Modals */}
        {showIdCard && <IdCardModal user={user} profile={profile} onClose={() => setShowIdCard(false)} />}
+       {showNotifications && <NotificationModal resident={resident} onClose={() => setShowNotifications(false)} />}
        <ConciergeWidget />
 
        {/* Unsaved Changes Confirmation Modal */}

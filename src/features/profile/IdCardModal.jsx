@@ -1,7 +1,7 @@
 // ID Card Modal Component
 import React from 'react';
 import { Shield, BadgeCheck, QrCode, X } from 'lucide-react';
-import { LOGO_URL, USER_PHOTO_URL } from '../../config';
+import { LOGO_URL } from '../../config';
 
 export const IdCardModal = ({ user, profile, onClose }) => {
   return (
@@ -14,7 +14,11 @@ export const IdCardModal = ({ user, profile, onClose }) => {
              <Shield className="w-8 h-8 text-yellow-300 opacity-80" />
            </div>
            <div className="flex flex-col items-center mt-4 relative z-10">
-             <div className="w-36 h-36 rounded-full p-1.5 bg-gradient-to-tr from-yellow-400 via-orange-300 to-yellow-500 shadow-2xl shadow-yellow-500/20"><img src={USER_PHOTO_URL} className="w-full h-full rounded-full object-cover border-[6px] border-emerald-900" /></div>
+             <div className="w-36 h-36 rounded-full p-1.5 bg-gradient-to-tr from-yellow-400 via-orange-300 to-yellow-500 shadow-2xl shadow-yellow-500/20">
+                <div className="w-full h-full rounded-full bg-emerald-800 flex items-center justify-center border-[6px] border-emerald-900">
+                    <span className="text-6xl font-bold text-white">{(profile?.name || 'W').charAt(0).toUpperCase()}</span>
+                </div>
+             </div>
              <h2 className="mt-5 text-2xl font-bold text-white tracking-tight">{profile?.name}</h2>
              <p className="text-emerald-200 text-sm font-medium mt-1 opacity-90">{profile?.job}</p>
              <div className="mt-4 flex items-center gap-2 bg-emerald-950/80 px-5 py-2 rounded-full border border-yellow-400/40 shadow-xl backdrop-blur-sm"><BadgeCheck className="w-4 h-4 text-yellow-400" /><span className="text-[10px] font-bold text-white uppercase tracking-wider">{profile?.status}</span></div>
