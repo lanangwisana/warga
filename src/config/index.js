@@ -1,3 +1,3 @@
 // Config exports
 export { app, auth, db } from './firebase';
-export { APP_ID, LOGO_URL, USER_PHOTO_URL } from './constants';
+export { APP_ID, LOGO_URL, USER_PHOTO_URL, DEFAULT_EVENT_IMAGE } from './constants';
