@@ -1,0 +1,3 @@
+{
+  "ignoreBuildCommand": "bash -c '[ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ]'"
+}
