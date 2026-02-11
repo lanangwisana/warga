@@ -697,7 +697,6 @@ export const ReportScreen = ({ user, profile, showToast }) => {
                     placeholder="Jelaskan kebutuhan izin Anda secara detail..."
                   ></textarea>
                 </div>
-
                 <button
                   type="submit"
                   disabled={isSubmitting}
