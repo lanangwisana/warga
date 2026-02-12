@@ -72,7 +72,7 @@ export const SocialScreen = ({ user, resident, showToast }) => {
             );
         }
         
-        setEvents(allEvents.sort((a,b) => new Date(b.date) - new Date(a.date)));
+        setEvents(allEvents.sort((a,b) => new Date(a.date) - new Date(b.date)));
     }, (err) => console.error("Events fetch error:", err));
     return () => unsub();
   }, [resident]);
