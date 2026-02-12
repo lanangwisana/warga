@@ -751,8 +751,16 @@ export const ReportScreen = ({ user, profile, showToast }) => {
                       {p.date}
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-500 truncate mt-0.5">
-                    {p.description}
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    {p.description?.split(/(?<=\.\s)|(?<=\.$)/).map((segment, i) => {
+                      const colonIndex = segment.indexOf(':');
+                      if (colonIndex > 0 && colonIndex < 20) {
+                        const label = segment.substring(0, colonIndex);
+                        const rest = segment.substring(colonIndex);
+                        return <span key={i}><strong className="font-semibold text-gray-700">{label}</strong>{rest}</span>;
+                      }
+                      return <span key={i}>{segment}</span>;
+                    })}
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                   {(() => {
