@@ -58,7 +58,6 @@ const Card = ({
   resident,
   icon,
   onClick,
-  extraCount,
   action,
 }) => (
   <div
@@ -77,12 +76,6 @@ const Card = ({
       </div>
 
       <p className="font-bold text-sm text-gray-900">{bill.title}</p>
-
-      {extraCount > 0 && (
-        <p className="text-xs text-red-500 font-bold mt-1">
-          +{extraCount} tagihan lainnya
-        </p>
-      )}
 
       <p
         className={`font-black text-xl mt-1 tracking-tight ${COLOR[color].text}`}
@@ -192,7 +185,6 @@ export const BillingWidget = ({ resident, showToast, setPaidBills }) => {
   };
 
   const dashboardBill = getDashboardBill(activeBills);
-  const extraCount = activeBills.length - 1;
 
   return (
     <>
@@ -204,7 +196,6 @@ export const BillingWidget = ({ resident, showToast, setPaidBills }) => {
               color="red"
               title="Pembayaran Ditolak"
               bill={dashboardBill}
-              extraCount={extraCount}
               resident={resident}
               onClick={() => setSelectedDetail(dashboardBill)}
               action={
@@ -226,7 +217,6 @@ export const BillingWidget = ({ resident, showToast, setPaidBills }) => {
               color="yellow"
               title="Menunggu Verifikasi"
               bill={dashboardBill}
-              extraCount={extraCount}
               resident={resident}
               icon={<Clock className="w-6 h-6 text-yellow-500" />}
               onClick={() => {
@@ -240,7 +230,6 @@ export const BillingWidget = ({ resident, showToast, setPaidBills }) => {
               color="red"
               title="Tagihan Aktif"
               bill={dashboardBill}
-              extraCount={extraCount}
               resident={resident}
               onClick={() => {
                 setSelectedDetail(dashboardBill);
