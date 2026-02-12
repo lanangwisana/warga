@@ -51,15 +51,7 @@ const STATUS_MAP = {
 };
 
 /* Reusable Card */
-const Card = ({
-  color,
-  title,
-  bill,
-  resident,
-  icon,
-  onClick,
-  action,
-}) => (
+const Card = ({ color, title, bill, resident, icon, onClick, action }) => (
   <div
     onClick={onClick}
     className={`cursor-pointer hover:scale-[1.01] mb-6 transition bg-white p-5 rounded-[24px] shadow-lg border ${COLOR[color].border} flex justify-between items-center`}
