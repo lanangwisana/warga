@@ -172,23 +172,23 @@ export const TransparencyService = ({ resident }) => {
       {/* HISTORY */}
       <div className="space-y-3 mt-2">
         {/* HEADER + PAGINATION */}
-        <div className="flex items-center justify-between gap-2 px-1">
-          <h4 className="text-sm font-bold text-slate-600">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <h4 className="text-xs sm:text-sm font-bold text-slate-600">
             Riwayat Transaksi {scope}
           </h4>
 
           <div className="flex items-center gap-2">
             {data.length > HISTORY_PER_PAGE && (
-              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm h-8">
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm h-8 overflow-x-auto">
                 <button
                   onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
                   disabled={historyPage === 1}
-                  className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                  className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3 sm:w-4 h-3 sm:h-4" />
                 </button>
 
-                <span className="text-[10px] font-bold text-slate-500 px-1 min-w-[3rem] text-center">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 px-1 min-w-[3rem] text-center">
                   {historyPage} / {totalPages}
                 </span>
 
@@ -197,12 +197,14 @@ export const TransparencyService = ({ resident }) => {
                     setHistoryPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={historyPage === totalPages}
-                  className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                  className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3 sm:w-4 h-3 sm:h-4" />
                 </button>
               </div>
             )}
+
+            {/* FILTER BUTTON */}
             <button
               onClick={() => setShowFilter(true)}
               className="h-8 flex items-center gap-1 text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 rounded-xl hover:bg-slate-50 active:scale-95 transition"
@@ -294,23 +296,31 @@ export const TransparencyService = ({ resident }) => {
                   </div>
 
                   {/* DATE */}
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      className="border rounded-lg px-3 py-2 text-xs w-full"
-                      value={filters.startDate}
-                      onChange={(e) =>
-                        setFilters((p) => ({ ...p, startDate: e.target.value }))
-                      }
-                    />
-                    <input
-                      type="date"
-                      className="border rounded-lg px-3 py-2 text-xs w-full"
-                      value={filters.endDate}
-                      onChange={(e) =>
-                        setFilters((p) => ({ ...p, endDate: e.target.value }))
-                      }
-                    />
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-2">
+                      Rentang Tanggal
+                    </p>
+                    <div className="flex gap-2 flex-col sm:flex-row">
+                      <input
+                        type="date"
+                        className="border rounded-lg px-3 py-2 text-xs w-full"
+                        value={filters.startDate}
+                        onChange={(e) =>
+                          setFilters((p) => ({
+                            ...p,
+                            startDate: e.target.value,
+                          }))
+                        }
+                      />
+                      <input
+                        type="date"
+                        className="border rounded-lg px-3 py-2 text-xs w-full"
+                        value={filters.endDate}
+                        onChange={(e) =>
+                          setFilters((p) => ({ ...p, endDate: e.target.value }))
+                        }
+                      />
+                    </div>
                   </div>
 
                   {/* ACTION */}

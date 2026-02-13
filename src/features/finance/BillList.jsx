@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Clock } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { collection, doc, onSnapshot, query, where, updateDoc } from "firebase/firestore";
 import { db, APP_ID } from "../../config";
 import { PaymentModal } from "./PaymentModal";
-import { Modal } from '../../components';
+import { Modal } from "../../components";
+import { PaymentHistory } from "./PaymentHistory";
 
 /* Helper styling map */
 const COLOR = {
@@ -33,17 +34,14 @@ const STATUS_MAP = {
     label: "Lunas",
     color: "text-emerald-600",
   },
-
   PENDING_VERIFICATION: {
     label: "Menunggu Verifikasi",
     color: "text-yellow-500",
   },
-
   REJECTED: {
     label: "Ditolak",
     color: "text-red-600",
   },
-
   UNPAID: {
     label: "Belum Bayar",
     color: "text-red-600",
@@ -51,15 +49,7 @@ const STATUS_MAP = {
 };
 
 /* Reusable Card */
-export const Card = ({
-  color,
-  title,
-  bill,
-  resident,
-  icon,
-  onClick,
-  action,
-}) => (
+const Card = ({ color, title, bill, resident, icon, onClick, action }) => (
   <div
     onClick={onClick}
     className={`cursor-pointer hover:scale-[1.01] mb-6 transition bg-white p-5 rounded-[24px] shadow-lg border ${COLOR[color].border} flex justify-between items-center`}
@@ -69,24 +59,19 @@ export const Card = ({
         <span
           className={`w-2 h-2 rounded-full animate-pulse ${COLOR[color].dot}`}
         />
-
         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
           {title} (RT {resident?.rt ?? "-"})
         </p>
       </div>
-
       <p className="font-bold text-sm text-gray-900">{bill.title}</p>
-
       <p
         className={`font-black text-xl mt-1 tracking-tight ${COLOR[color].text}`}
       >
         Rp {bill.amount.toLocaleString()}
       </p>
     </div>
-
     <div className="flex items-center gap-3">
       {action}
-
       {icon && (
         <div className={`p-3 rounded-full ${COLOR[color].soft}`}>{icon}</div>
       )}
@@ -94,8 +79,11 @@ export const Card = ({
   </div>
 );
 
-export const BillingWidget = ({ resident, showToast }) => {
+export const BillList = ({ resident, showToast }) => {
+  const ITEMS_PER_PAGE = 3;
   const [activeBills, setActiveBills] = useState([]);
+  const [paidBills, setPaidBills] = useState([]);
+  const [page, setPage] = useState(1);
   const [selectedBill, setSelectedBill] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
 
@@ -125,8 +113,12 @@ export const BillingWidget = ({ resident, showToast }) => {
       const active = allBills
         .filter((b) => b.status !== "PAID")
         .sort((a, b) => b.period.localeCompare(a.period));
-
       setActiveBills(active);
+
+      const paid = allBills
+        .filter((b) => b.status === "PAID")
+        .sort((a, b) => b.period.localeCompare(a.period));
+      setPaidBills(paid);
     });
 
     return unsub;
@@ -158,93 +150,86 @@ export const BillingWidget = ({ resident, showToast }) => {
       "Pembayaran berhasil dikirim! Menunggu konfirmasi Admin.",
       "success",
     );
-
     setSelectedBill(null);
   };
 
-  if (!activeBills.length) return null;
-  const getDashboardBill = (bills) => {
-    if (!bills.length) return null;
-    const priorityOrder = ["REJECTED", "UNPAID", "PENDING_VERIFICATION"];
-
-    for (let status of priorityOrder) {
-      const found = bills
-        .filter((b) => b.status === status)
-        .sort((a, b) => a.period.localeCompare(b.period));
-
-      if (found.length) return found[0];
-    }
-
-    return null;
-  };
-
-  const dashboardBill = getDashboardBill(activeBills);
+  const totalPages = Math.ceil(activeBills.length / ITEMS_PER_PAGE);
+  const paginatedBills = activeBills.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE,
+  );
 
   return (
-    <>
-      {/* CARD */}
-      {dashboardBill && (
-        <div className="px-1 mb-6 animate-fade-in">
-          {dashboardBill.status === "REJECTED" && (
-            <Card
-              color="red"
-              title="Pembayaran Ditolak"
-              bill={dashboardBill}
-              resident={resident}
-              onClick={() => setSelectedDetail(dashboardBill)}
-              action={
+    <div>
+      {/* CARDS */}
+      {paginatedBills.map((bill) => {
+        const color =
+          bill.status === "REJECTED" || bill.status === "UNPAID"
+            ? "red"
+            : "yellow";
+        const title =
+          bill.status === "REJECTED"
+            ? "Pembayaran Ditolak"
+            : bill.status === "UNPAID"
+              ? "Tagihan Aktif"
+              : "Menunggu Verifikasi";
+
+        return (
+          <Card
+            key={bill.id}
+            color={color}
+            title={title}
+            bill={bill}
+            resident={resident}
+            icon={
+              bill.status === "PENDING_VERIFICATION" ? (
+                <Clock className="w-6 h-6 text-yellow-500" />
+              ) : null
+            }
+            action={
+              bill.status !== "PENDING_VERIFICATION" && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedBill(dashboardBill);
+                    setSelectedBill(bill);
                   }}
                   className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold"
                 >
-                  BAYAR ULANG
+                  {bill.status === "REJECTED" ? "BAYAR ULANG" : "BAYAR"}
                 </button>
-              }
-            />
-          )}
+              )
+            }
+            onClick={() => setSelectedDetail(bill)}
+          />
+        );
+      })}
 
-          {dashboardBill.status === "PENDING_VERIFICATION" && (
-            <Card
-              color="yellow"
-              title="Menunggu Verifikasi"
-              bill={dashboardBill}
-              resident={resident}
-              icon={<Clock className="w-6 h-6 text-yellow-500" />}
-              onClick={() => {
-                setSelectedDetail(dashboardBill);
-              }}
-            />
-          )}
+      {/* PAGINATION */}
+      {totalPages > 1 && (
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm h-8 justify-center mt-4">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
 
-          {dashboardBill.status === "UNPAID" && (
-            <Card
-              color="red"
-              title="Tagihan Aktif"
-              bill={dashboardBill}
-              resident={resident}
-              onClick={() => {
-                setSelectedDetail(dashboardBill);
-              }}
-              action={
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedBill(dashboardBill);
-                  }}
-                  className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold"
-                >
-                  BAYAR
-                </button>
-              }
-            />
-          )}
+          <span className="text-[10px] font-bold text-slate-500 px-1 min-w-[3rem] text-center">
+            {page} / {totalPages}
+          </span>
+
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* MODAL POP UP */}
+      {/* PAYMENT MODAL */}
       {selectedBill && (
         <PaymentModal
           bill={selectedBill}
@@ -252,6 +237,8 @@ export const BillingWidget = ({ resident, showToast }) => {
           onSuccess={handlePaymentSuccess}
         />
       )}
+
+      {/* DETAIL MODAL */}
       {selectedDetail && (
         <Modal title="Detail Tagihan" onClose={() => setSelectedDetail(null)}>
           <div className="space-y-4">
@@ -261,21 +248,16 @@ export const BillingWidget = ({ resident, showToast }) => {
               </label>
               <p className="font-bold">{selectedDetail.period}</p>
             </div>
-
             <div>
               <label className="text-[10px] uppercase text-gray-400 font-bold">
                 Status
               </label>
-
               <p
-                className={`font-bold ${
-                  STATUS_MAP[selectedDetail.status]?.color
-                }`}
+                className={`font-bold ${STATUS_MAP[selectedDetail.status]?.color}`}
               >
                 {STATUS_MAP[selectedDetail.status]?.label}
               </p>
             </div>
-
             <div>
               <label className="text-[10px] uppercase text-gray-400 font-bold">
                 Nominal
@@ -284,7 +266,6 @@ export const BillingWidget = ({ resident, showToast }) => {
                 Rp {selectedDetail.amount.toLocaleString()}
               </p>
             </div>
-
             {selectedDetail.paymentMethod && (
               <div>
                 <label className="text-[10px] uppercase text-gray-400 font-bold">
@@ -295,7 +276,6 @@ export const BillingWidget = ({ resident, showToast }) => {
                 </p>
               </div>
             )}
-
             {selectedDetail.submittedAt && (
               <div>
                 <label className="text-[10px] uppercase text-gray-400 font-bold">
@@ -306,13 +286,11 @@ export const BillingWidget = ({ resident, showToast }) => {
                 </p>
               </div>
             )}
-
             {selectedDetail.paymentProof && (
               <div>
                 <label className="text-[10px] uppercase text-gray-400 font-bold">
                   Bukti Pembayaran
                 </label>
-
                 <img
                   src={selectedDetail.paymentProof}
                   alt="payment proof"
@@ -320,8 +298,6 @@ export const BillingWidget = ({ resident, showToast }) => {
                 />
               </div>
             )}
-
-            {/* REJECT ONLY */}
             {selectedDetail.status === "REJECTED" &&
               selectedDetail.rejectedReason && (
                 <div className="bg-red-50 p-3 rounded-xl">
@@ -334,6 +310,13 @@ export const BillingWidget = ({ resident, showToast }) => {
           </div>
         </Modal>
       )}
-    </>
+
+      {/* PAYMENT HISTORY */}
+      {paidBills.length > 0 && (
+        <div className="mt-6">
+          <PaymentHistory paidBills={paidBills} resident={resident} />
+        </div>
+      )}
+    </div>
   );
 };
