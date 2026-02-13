@@ -160,9 +160,9 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
             </div>
             
             {/* ID Card */}
-            <div className="relative w-full aspect-[1.58/1] max-w-[400px] mx-auto bg-gradient-to-br from-[#0F2027] via-[#203A43] to-[#2C5364] rounded-[24px] overflow-hidden shadow-2xl shadow-emerald-900/30 border border-white/10 mb-8 transform transition-transform hover:scale-[1.02] group">
+            <div className="relative w-full max-w-[400px] mx-auto bg-gradient-to-br from-[#0F2027] via-[#203A43] to-[#2C5364] rounded-[24px] overflow-hidden shadow-2xl shadow-emerald-900/30 border border-white/10 mb-8 transform transition-transform hover:scale-[1.02] group">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
-                <div className="p-6 h-full flex flex-col relative z-10">
+                <div className="p-6 flex flex-col relative z-10">
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2.5">
                             <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-md p-1.5 flex items-center justify-center border border-white/20 shadow-inner">
