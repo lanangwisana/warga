@@ -124,7 +124,7 @@ export const BillingWidget = ({ resident, showToast, setPaidBills }) => {
         .filter((b) => b.status === "PAID")
         .sort((a, b) => b.period.localeCompare(a.period));
 
-      setPaidBills(paid);
+      if (setPaidBills) setPaidBills(paid);
     });
 
     return unsub;
