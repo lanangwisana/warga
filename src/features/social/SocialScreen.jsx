@@ -72,7 +72,7 @@ export const SocialScreen = ({ user, resident, showToast }) => {
             );
         }
         
-        setEvents(allEvents.sort((a,b) => new Date(b.date) - new Date(a.date)));
+        setEvents(allEvents.sort((a,b) => new Date(a.date) - new Date(b.date)));
     }, (err) => console.error("Events fetch error:", err));
     return () => unsub();
   }, [resident]);
@@ -138,6 +138,7 @@ export const SocialScreen = ({ user, resident, showToast }) => {
               author: resident?.name || user?.email?.split('@')[0] || 'Warga',
               authorId: user?.uid,
               authorRole: resident?.role || 'WARGA',
+              rt: resident?.rt || '',
               createdAt: new Date().toISOString()
           });
           setNewComment('');
@@ -298,7 +299,11 @@ export const SocialScreen = ({ user, resident, showToast }) => {
                                         {activeThread.author.charAt(0)}
                                     </div>
                                     <div>
-                                        <p className="text-xs font-black text-gray-900">{activeThread.author}</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="text-xs font-black text-gray-900">{activeThread.author}</p>
+                                            {activeThread.authorRole === 'RW' && <span className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm">RW</span>}
+                                            {activeThread.authorRole === 'RT' && <span className="text-[8px] bg-orange-500 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm">RT{activeThread.rt || ''}</span>}
+                                        </div>
                                         <p className="text-[9px] text-gray-400 font-bold uppercase">{formatForumTime(activeThread.createdAt)}</p>
                                     </div>
                                 </div>
@@ -326,7 +331,8 @@ export const SocialScreen = ({ user, resident, showToast }) => {
                                     >
                                         <div className="flex items-center gap-1.5 mb-1 px-1">
                                             <span className="text-[10px] font-bold text-gray-400">{comment.author}</span>
-                                            {comment.authorRole === 'RW' && <span className="text-[7px] bg-black text-white px-1 py-0.5 rounded font-black">Admin</span>}
+                                            {comment.authorRole === 'RW' && <span className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm">RW</span>}
+                                            {comment.authorRole === 'RT' && <span className="text-[8px] bg-orange-500 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm">RT{comment.rt || ''}</span>}
                                         </div>
                                         <div className={`p-3.5 rounded-2xl text-[13px] leading-relaxed shadow-sm ${
                                             comment.authorId === user?.uid 
