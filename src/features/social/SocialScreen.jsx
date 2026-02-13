@@ -160,23 +160,6 @@ export const SocialScreen = ({ user, resident, showToast }) => {
        
        {tab === 'events' && (
          <div className="space-y-4">
-            <button onClick={()=>setShowEventGen(!showEventGen)} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-3.5 rounded-2xl shadow-lg flex items-center justify-between group active:scale-[0.98] transition-all">
-                <span className="flex items-center gap-2.5 font-bold text-sm"><Sparkles className="w-4 h-4 text-yellow-300 fill-yellow-300"/> ✨ Generator Ide Kegiatan</span>
-                <ChevronRight className={`w-5 h-5 transition-transform ${showEventGen ? 'rotate-90' : ''}`}/>
-            </button>
-            {showEventGen && (
-                <div className="bg-white border border-purple-100 rounded-2xl p-4 shadow-sm animate-fade-in">
-                     <p className="text-xs text-gray-500 mb-3">Tulis tema acara (misal: "Agustusan"), AI akan buatkan rencananya!</p>
-                     <div className="flex gap-2 mb-3">
-                        <input value={eventTheme} onChange={e=>setEventTheme(e.target.value)} placeholder="Contoh: Lomba Masak" className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-base outline-none focus:ring-2 focus:ring-purple-500" />
-                        <button onClick={handleGenerateEvent} disabled={isGenerating} className="bg-purple-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:bg-purple-700 transition-colors active:scale-95">
-                            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Buat Ide'}
-                        </button>
-                     </div>
-                     {eventIdea && <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{eventIdea}</div>}
-                </div>
-            )}
-            
             <div className="space-y-3">
                 {events.length === 0 ? (
                     <div className="py-12 text-center">
