@@ -26,15 +26,6 @@ import {
   NotificationModal
 } from './features';
 
-// Concierge Widget
-const ConciergeWidget = () => {
-    const [isOpen, setIsOpen] = useState(false);
-    return (
-        <button onClick={() => setIsOpen(!isOpen)} className="fixed bottom-24 right-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-3.5 rounded-full shadow-[0_4px_20px_rgba(16,185,129,0.3)] z-40 active:scale-90 transition-transform hover:shadow-emerald-500/50">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </button>
-    );
-};
 
 // Main App
 export default function App() {
@@ -302,7 +293,6 @@ export default function App() {
        {/* Modals */}
        {showIdCard && <IdCardModal user={user} profile={profile} onClose={() => setShowIdCard(false)} />}
        {showNotifications && <NotificationModal resident={resident} onClose={() => setShowNotifications(false)} />}
-       <ConciergeWidget />
 
        {/* Unsaved Changes Confirmation Modal */}
        {showUnsavedModal && (
