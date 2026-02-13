@@ -1,9 +1,8 @@
 // Finance Screen
 import React, { useState } from "react";
 import { Wallet } from "lucide-react";
-import { BillingWidget } from "./BillingWidget";
+import { BillList } from "./BillList";
 import { TransparencyService } from "./TransparencyService";
-import { PaymentHistory } from "./PaymentHistory";
 
 export const FinanceScreen = ({ resident, user, showToast }) => {
   const [tab, setTab] = useState("billing");
@@ -30,13 +29,7 @@ export const FinanceScreen = ({ resident, user, showToast }) => {
       </div>
       {tab === "billing" ? (
         <>
-          <BillingWidget
-            resident={resident}
-            showToast={showToast}
-            setPaidBills={setPaidBills}
-          />
-
-          <PaymentHistory paidBills={paidBills} resident={resident} />
+          <BillList resident={resident} showToast={showToast} />
         </>
       ) : (
         <TransparencyService resident={resident} />

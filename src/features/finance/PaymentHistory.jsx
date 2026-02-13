@@ -1,9 +1,9 @@
 // Payment History Component
 import React, { useState } from "react";
-import { CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 import { Modal } from "../../components";
 
-const PAID_PER_PAGE = 5;
+const PAID_PER_PAGE = 3;
 const STATUS_MAP = {
   PAID: {
     label: "Lunas",
@@ -80,28 +80,30 @@ export const PaymentHistory = ({ paidBills = [], resident }) => {
 
       {/* PAGINATION */}
       {totalPages > 1 && (
-        <div className="flex justify-end gap-2 mt-3">
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-0.5 shadow-sm h-8 justify-center mt-4">
           <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="text-xs px-2 py-1 border rounded-lg"
+            className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
           >
-            Prev
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
-          <span className="text-xs font-bold">
-            {page}/{totalPages}
+          <span className="text-[10px] font-bold text-slate-500 px-1 min-w-[3rem] text-center">
+            {page} / {totalPages}
           </span>
 
           <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="text-xs px-2 py-1 border rounded-lg"
+            className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
           >
-            Next
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
+
+      {/* DETAIL MODAL */}
       {selectedDetail && (
         <Modal title="Detail Tagihan" onClose={() => setSelectedDetail(null)}>
           <div className="space-y-4">
