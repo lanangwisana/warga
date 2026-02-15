@@ -166,8 +166,8 @@ export default function App() {
         const uid = auth.currentUser?.uid || residentData.uid;
 
         if (uid) {
-            // SYNC 1: Copy resident data to user's private profile
-            await setDoc(doc(db, 'artifacts', APP_ID, 'users', uid, 'profile', 'main'), residentData);
+            // SYNC 1: Merge resident data into user's private profile (merge: true preserves existing fields like profilePhoto)
+            await setDoc(doc(db, 'artifacts', APP_ID, 'users', uid, 'profile', 'main'), residentData, { merge: true });
             
             // SYNC 2: Link this UID back to the public resident document
             await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', residentData.id), {
@@ -176,9 +176,9 @@ export default function App() {
             });
         }
 
-        setResident(residentData);
-        setProfile(residentData);
-        localStorage.setItem('resident_data', JSON.stringify(residentData));
+        // Don't manually set resident/profile here — the real-time onSnapshot listener
+        // will fire after setDoc and update state with the FULL merged data (including profilePhoto).
+        // Setting it manually here would overwrite the merged data with public-only data.
         setIsLoginRequired(false);
         showToast(`Selamat datang, ${residentData.name}!`, "success"); 
       } catch (e) { 
