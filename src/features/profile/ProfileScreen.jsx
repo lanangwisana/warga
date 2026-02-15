@@ -89,9 +89,16 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
         setShowDeletePhotoConfirm(false);
         setEditData(prev => ({ ...prev, profilePhoto: '' }));
         try {
+            // Delete from private profile
             await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), {
                 profilePhoto: deleteField()
             });
+            // Also delete from public residents collection
+            if (profileData.id) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', profileData.id), {
+                    profilePhoto: deleteField()
+                });
+            }
             showToast('Foto profil berhasil dihapus!', 'success');
         } catch (err) {
             console.error(err);
@@ -140,7 +147,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
             // 2. Sync to Public Data (Admin) - IF resident ID exists
             // We use editData.id (preserved from profileData)
             if (editData.id) {
-                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', editData.id), {
+                const publicSyncData = {
                     name: editData.name,
                     job: finalJob,
                     phone: editData.phone || '',
@@ -148,7 +155,12 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                     family: finalFamily,
                     updatedBy: 'USER_SYNC',
                     lastSyncAt: new Date().toISOString()
-                });
+                };
+                // Sync profilePhoto to public collection
+                if (editData.profilePhoto) {
+                    publicSyncData.profilePhoto = editData.profilePhoto;
+                }
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', editData.id), publicSyncData);
                 console.log("Synced to public resident data:", editData.id);
             }
 
