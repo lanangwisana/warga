@@ -1,8 +1,9 @@
 // Profile Screen Component
-import React, { useState, useEffect } from 'react';
-import { User, Briefcase, Home, LogOut, Save, BadgeCheck, Shield, QrCode, Phone, Users, Plus, Trash2 } from 'lucide-react';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Briefcase, Home, LogOut, Save, BadgeCheck, Shield, QrCode, Phone, Users, Plus, Trash2, Camera, X as XIcon } from 'lucide-react';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db, APP_ID, LOGO_URL, USER_PHOTO_URL } from '../../config';
+import { compressImage } from '../../utils/helpers';
 
 export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) => {
     const [editData, setEditData] = useState(null);
@@ -14,6 +15,9 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
     const [tempFamily, setTempFamily] = useState({ name: '', relation: 'Anak' });
     const [customJob, setCustomJob] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const [showDeletePhotoConfirm, setShowDeletePhotoConfirm] = useState(false);
+    const photoInputRef = useRef(null);
 
     // Navigation and Browser reload protection
     useEffect(() => {
@@ -56,6 +60,52 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
         setIsEditing(true);
     };
 
+    // Handle photo upload
+    const handlePhotoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('Pilih file gambar (JPG/PNG)', 'error');
+            return;
+        }
+        setIsUploadingPhoto(true);
+        try {
+            const base64 = await compressImage(file, 400, 0.6);
+            setEditData(prev => ({ ...prev, profilePhoto: base64 }));
+            showToast('Foto berhasil dipilih! Tekan Simpan untuk menyimpan.', 'success');
+        } catch (err) {
+            console.error(err);
+            showToast('Gagal memproses foto.', 'error');
+        }
+        setIsUploadingPhoto(false);
+        if (photoInputRef.current) photoInputRef.current.value = '';
+    };
+
+    const handleRemovePhoto = () => {
+        setShowDeletePhotoConfirm(true);
+    };
+
+    const confirmRemovePhoto = async () => {
+        setShowDeletePhotoConfirm(false);
+        setEditData(prev => ({ ...prev, profilePhoto: '' }));
+        try {
+            // Delete from private profile
+            await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), {
+                profilePhoto: deleteField()
+            });
+            // Also delete from public residents collection
+            if (profileData.id) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', profileData.id), {
+                    profilePhoto: deleteField()
+                });
+            }
+            showToast('Foto profil berhasil dihapus!', 'success');
+        } catch (err) {
+            console.error(err);
+            showToast('Gagal menghapus foto.', 'error');
+        }
+    };
+
     const handleCancelEdit = () => {
         setIsEditing(false);
         setEditData(null);
@@ -87,12 +137,17 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
             // Remove cluster data if any
             delete payload.cluster;
 
+            // If photo was removed, use deleteField() to remove from Firestore entirely
+            if (!payload.profilePhoto) {
+                payload.profilePhoto = deleteField();
+            }
+
             await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'profile', 'main'), payload);
 
             // 2. Sync to Public Data (Admin) - IF resident ID exists
             // We use editData.id (preserved from profileData)
             if (editData.id) {
-                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', editData.id), {
+                const publicSyncData = {
                     name: editData.name,
                     job: finalJob,
                     phone: editData.phone || '',
@@ -100,7 +155,12 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                     family: finalFamily,
                     updatedBy: 'USER_SYNC',
                     lastSyncAt: new Date().toISOString()
-                });
+                };
+                // Sync profilePhoto to public collection
+                if (editData.profilePhoto) {
+                    publicSyncData.profilePhoto = editData.profilePhoto;
+                }
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'residents', editData.id), publicSyncData);
                 console.log("Synced to public resident data:", editData.id);
             }
 
@@ -178,17 +238,28 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
 
                     <div className="flex-1 flex items-center gap-5 mt-2 pl-1">
                         <div className="relative w-[88px] h-[88px] rounded-full p-1 bg-gradient-to-tr from-emerald-400 to-teal-500 shadow-xl">
-                            <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center border-[3px] border-[#203A43]">
-                                <span className="text-3xl font-bold text-white">
-                                    {(isEditing && editData?.name ? editData.name : profileData.name || 'W').charAt(0).toUpperCase()}
-                                </span>
-                            </div>
+                            {(() => {
+                                const photo = isEditing && editData ? editData.profilePhoto : profileData.profilePhoto;
+                                const nameSource = isEditing && editData?.name ? editData.name : profileData.name || 'W';
+                                const initials = nameSource.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                                return photo ? (
+                                    <img src={photo} alt="profile" className="w-full h-full rounded-full object-cover border-[3px] border-[#203A43]" />
+                                ) : (
+                                    <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center border-[3px] border-[#203A43]">
+                                        <span className="text-2xl font-bold text-white">{initials}</span>
+                                    </div>
+                                );
+                            })()}
                             <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-[3px] border-[#203A43] rounded-full flex items-center justify-center shadow-sm">
                                 <BadgeCheck className="w-3.5 h-3.5 text-white" />
                             </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-2xl font-bold text-white tracking-tight truncate leading-tight">{profileData.name || 'Nama Warga'}</h2>
+                            {(() => {
+                                const cardName = profileData.name || 'Nama Warga';
+                                const cardNameSize = cardName.length <= 15 ? 'text-2xl' : cardName.length <= 22 ? 'text-xl' : 'text-base';
+                                return <h2 className={`${cardNameSize} font-bold text-white tracking-tight leading-tight break-words`}>{cardName}</h2>;
+                            })()}
                             <p className="text-emerald-200 text-xs font-medium truncate mb-2.5 opacity-90">{profileData.job || 'Pekerjaan'}</p>
                             <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md border border-white/5 shadow-sm">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
@@ -223,6 +294,34 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                 </div>
                 {isEditing && editData ? (
                     <div className="w-full space-y-4 mt-2 animate-fade-in">
+                        {/* Photo Upload */}
+                        <div className="flex flex-col items-center gap-3 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                            <div className="relative">
+                                {editData.profilePhoto ? (
+                                    <div className="relative">
+                                        <img src={editData.profilePhoto} alt="preview" className="w-20 h-20 rounded-full object-cover border-2 border-emerald-500 shadow-md" />
+                                        <button onClick={handleRemovePhoto} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-md">
+                                            <XIcon className="w-3 h-3 text-white" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-dashed border-gray-300">
+                                        <Camera className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                )}
+                            </div>
+                            <input type="file" accept="image/*" ref={photoInputRef} onChange={handlePhotoUpload} className="hidden" />
+                            <button 
+                                onClick={() => photoInputRef.current?.click()} 
+                                disabled={isUploadingPhoto}
+                                className="text-xs font-bold px-4 py-2 bg-emerald-600 text-white rounded-lg active:scale-95 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                <Camera className="w-3.5 h-3.5" />
+                                {isUploadingPhoto ? 'Memproses...' : editData.profilePhoto ? 'Ganti Foto' : 'Upload Foto Profil'}
+                            </button>
+                            <p className="text-[10px] text-gray-400">JPG/PNG, otomatis dikompresi</p>
+                        </div>
+
                         {/* Editable Fields */}
                         <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Nama Lengkap</label><input className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none" value={editData.name||''} onChange={e=>setEditData({...editData, name:e.target.value})}/></div>
                         
@@ -423,6 +522,35 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
                             >
                                 Ya, Keluar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Modal for Delete Photo Confirmation */}
+            {showDeletePhotoConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl scale-100 animate-scale-in">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                            <Camera className="w-6 h-6 text-red-500"/>
+                        </div>
+                        <h3 className="text-lg font-bold text-center text-gray-900 mb-2">Hapus Foto Profil?</h3>
+                        <p className="text-center text-gray-500 text-sm mb-6">
+                            Foto profil Anda akan dihapus dan diganti dengan <b>inisial nama</b>. Perubahan disimpan setelah Anda klik Simpan.
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setShowDeletePhotoConfirm(false)}
+                                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                onClick={confirmRemovePhoto}
+                                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
+                            >
+                                Ya, Hapus
                             </button>
                         </div>
                     </div>

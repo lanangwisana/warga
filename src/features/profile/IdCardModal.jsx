@@ -15,8 +15,12 @@ export const IdCardModal = ({ user, profile, onClose }) => {
            </div>
            <div className="flex flex-col items-center mt-4 relative z-10">
              <div className="w-36 h-36 rounded-full p-1.5 bg-gradient-to-tr from-yellow-400 via-orange-300 to-yellow-500 shadow-2xl shadow-yellow-500/20">
-                <div className="w-full h-full rounded-full bg-emerald-800 flex items-center justify-center border-[6px] border-emerald-900">
-                    <span className="text-6xl font-bold text-white">{(profile?.name || 'W').charAt(0).toUpperCase()}</span>
+                <div className="w-full h-full rounded-full bg-emerald-800 flex items-center justify-center border-[6px] border-emerald-900 overflow-hidden">
+                    {profile?.profilePhoto ? (
+                        <img src={profile.profilePhoto} alt="profile" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="text-5xl font-bold text-white">{(profile?.name || 'W').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()}</span>
+                    )}
                 </div>
              </div>
              <h2 className="mt-5 text-2xl font-bold text-white tracking-tight">{profile?.name}</h2>
