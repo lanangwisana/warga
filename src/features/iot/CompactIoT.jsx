@@ -19,6 +19,8 @@ export const CompactIoT = ({ user }) => {
     return;
   };
 
+  return null; // Hidden while in development
+  
   return (
     <div className="grid grid-cols-2 gap-4 mb-6 px-1 select-none">
        {/* CCTV Card */}
