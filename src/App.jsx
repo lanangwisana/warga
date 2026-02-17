@@ -187,17 +187,7 @@ export default function App() {
       }
   };
   
-  // Logout handler
-  const handleLogout = async () => { 
-    if (isNavBlocked) {
-        setPendingAction({ type: 'LOGOUT' });
-        setShowUnsavedModal(true);
-        return;
-    }
-    await processLogout();
-  };
-
-  const processLogout = async () => {
+  const processLogout = React.useCallback(async () => {
     await signOut(auth); 
     setUser(null); 
     setResident(null);
@@ -205,9 +195,19 @@ export default function App() {
     localStorage.removeItem('resident_data');
     setIsLoginRequired(true); 
     setActiveTab('home');
-  };
+  }, []);
 
-  const confirmPendingAction = () => {
+  // Logout handler
+  const handleLogout = React.useCallback(async () => { 
+    if (isNavBlocked) {
+        setPendingAction({ type: 'LOGOUT' });
+        setShowUnsavedModal(true);
+        return;
+    }
+    await processLogout();
+  }, [isNavBlocked, processLogout]);
+
+  const confirmPendingAction = React.useCallback(() => {
     setShowUnsavedModal(false);
     setIsNavBlocked(false); // Force unblock to allow navigation
     if (pendingAction?.type === 'TAB') {
@@ -216,7 +216,7 @@ export default function App() {
         processLogout();
     }
     setPendingAction(null);
-  };
+  }, [pendingAction, processLogout]);
 
   // Loading state
   if (loading) return (
