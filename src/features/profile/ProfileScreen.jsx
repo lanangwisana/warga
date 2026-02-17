@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Briefcase, Home, LogOut, Save, BadgeCheck, Shield, QrCode, Phone, Users, Plus, Trash2, Camera, X as XIcon } from 'lucide-react';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
-import { db, APP_ID, LOGO_URL, USER_PHOTO_URL } from '../../config';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { db, auth, APP_ID, LOGO_URL, USER_PHOTO_URL } from '../../config';
 import { compressImage } from '../../utils/helpers';
 
 export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) => {
@@ -16,7 +17,9 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
     const [customJob, setCustomJob] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
     const [showDeletePhotoConfirm, setShowDeletePhotoConfirm] = useState(false);
+    const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
     const photoInputRef = useRef(null);
 
     // Navigation and Browser reload protection
@@ -153,6 +156,7 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                     phone: editData.phone || '',
                     isSingle: editData.isSingle || false,
                     family: finalFamily,
+                    email: editData.email || user.email || '', // Sync Email
                     updatedBy: 'USER_SYNC',
                     lastSyncAt: new Date().toISOString()
                 };
@@ -177,6 +181,28 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
         }
         setIsSaving(false);
     };
+
+    const handleResetPassword = () => {
+        if (!profileData.email && !user.email) {
+            showToast("Email tidak ditemukan.", "error");
+            return;
+        }
+        setShowResetConfirmModal(true);
+    };
+
+    const confirmResetPassword = async () => {
+        setShowResetConfirmModal(false);
+        const emailToReset = profileData.email || user.email;
+        try {
+            await sendPasswordResetEmail(auth, emailToReset);
+            showToast(`Link reset dikirim ke ${emailToReset}. Cek Inbox/Spam ya!`, "success");
+        } catch (error) {
+            console.error("Reset Password Error:", error);
+            showToast("Gagal mengirim link reset password.", "error");
+        }
+    };
+    
+
 
     const addFamilyMember = () => {
         if(!tempFamily.name) return;
@@ -359,6 +385,27 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                         
                         <div><label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">No. WhatsApp</label><input className="w-full bg-gray-50 p-3 rounded-xl text-base font-bold border-b-2 border-emerald-500 outline-none" placeholder="08..." value={editData.phone||''} onChange={e=>setEditData({...editData, phone:e.target.value})}/></div>
 
+                        {/* Keamanan Akun */}
+                        <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                             <p className="text-[10px] font-bold text-yellow-600 uppercase mb-3 flex items-center gap-1"><Shield className="w-3 h-3"/> Keamanan Akun</p>
+                             
+                             <div className="mb-3">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase block text-left mb-1">Email Terdaftar</label>
+                                <input disabled className="w-full bg-white p-2 rounded-lg text-sm font-bold border border-gray-200 text-gray-500" value={editData.email || user.email || '-'} />
+                             </div>
+
+                             <button 
+                                onClick={handleResetPassword}
+                                className="w-full py-2 bg-white border border-yellow-200 text-yellow-700 rounded-lg text-xs font-bold hover:bg-yellow-100 transition-colors"
+                             >
+                                Ubah Password via Email
+                             </button>
+                             
+                             <p className="text-[10px] text-yellow-600 mt-2 text-center italic">
+                                * Link reset akan dikirim ke email. Cek folder <b>SPAM</b> jika tidak ada di Inbox.
+                             </p>
+                        </div>
+
                         {/* Read Only Fields (Locked) */}
                         <div className="p-3 bg-red-50 rounded-xl border border-red-100">
                              <p className="text-[10px] font-bold text-red-400 uppercase mb-2 flex items-center gap-1"><Shield className="w-3 h-3"/> Data Terkunci (Hubungi RT)</p>
@@ -433,6 +480,33 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                                     ))}
                                 </ul>
                              )}
+                        </div>
+
+                        
+                        {/* Security Info (Read Only) */}
+                        <div className="p-3 bg-yellow-50 rounded-xl border border-yellow-100 mt-2">
+                             <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-yellow-600"/>
+                                    <span className="text-xs font-bold text-yellow-700 uppercase">Keamanan Akun</span>
+                                </div>
+                             </div>
+                             
+                             <div className="bg-white p-2.5 rounded-lg border border-yellow-100 mb-2">
+                                <p className="text-[10px] text-gray-400 uppercase">Email Terdaftar</p>
+                                <p className="text-sm font-bold text-gray-800 break-all">{profileData.email || user.email || '-'}</p>
+                             </div>
+                             
+                             <p className="text-[10px] text-yellow-600 mb-2 italic">
+                                * Link reset akan dikirim ke email. Cek folder <b>SPAM</b> jika tidak ada di Inbox.
+                             </p>
+
+                             <button 
+                                onClick={handleResetPassword}
+                                className="w-full py-2 bg-yellow-100 text-yellow-700 rounded-lg text-xs font-bold hover:bg-yellow-200 transition-colors"
+                             >
+                                Ubah Password via Email
+                             </button>
                         </div>
                     </div>
                 )}
@@ -556,6 +630,38 @@ export const ProfileScreen = ({ user, onLogout, showToast, setIsNavBlocked }) =>
                     </div>
                 </div>
             )}
+            
+            {/* Custom Modal for Reset Password Confirmation */}
+            {showResetConfirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl scale-100 animate-scale-in">
+                        <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                            <Shield className="w-6 h-6 text-yellow-600"/>
+                        </div>
+                        <h3 className="text-lg font-bold text-center text-gray-900 mb-2">Reset Password?</h3>
+                        <p className="text-center text-gray-500 text-sm mb-6">
+                            Link untuk membuat password baru akan dikirim ke email: <br/>
+                            <span className="font-bold text-gray-800">{profileData.email || user.email}</span>
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setShowResetConfirmModal(false)}
+                                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button 
+                                onClick={confirmResetPassword}
+                                className="flex-1 py-2.5 rounded-xl bg-yellow-500 text-white font-bold text-sm hover:bg-yellow-600 shadow-lg shadow-yellow-200 transition-colors"
+                            >
+                                Kirim Link
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+
         </div>
     );
 };
