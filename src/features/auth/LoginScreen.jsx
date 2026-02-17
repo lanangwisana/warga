@@ -19,10 +19,11 @@ export const LoginScreen = ({ onLogin, showToast }) => {
   const [phone, setPhone] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // UI States
   const [isLoading, setIsLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [residentData, setResidentData] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // --- PHONE CHECK (Smart Entry Point) ---
   const handlePhoneCheck = async (e) => {
@@ -73,6 +74,7 @@ export const LoginScreen = ({ onLogin, showToast }) => {
     if (!email || !password) return;
 
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
@@ -112,24 +114,27 @@ export const LoginScreen = ({ onLogin, showToast }) => {
       }
     } catch (error) {
       console.error("Login Error:", error);
+      let msg = '';
       switch (error.code) {
         case 'auth/invalid-credential':
         case 'auth/user-not-found':
         case 'auth/wrong-password':
-          showToast("Email atau Password salah.", "error");
+          msg = 'Email atau Password salah.';
           break;
         case 'auth/too-many-requests':
-          showToast("Terlalu banyak percobaan. Coba lagi dalam beberapa menit.", "error");
+          msg = 'Terlalu banyak percobaan. Coba lagi dalam beberapa menit.';
           break;
         case 'auth/user-disabled':
-          showToast("Akun Anda dinonaktifkan. Hubungi pengurus RT/RW.", "error");
+          msg = 'Akun Anda dinonaktifkan. Hubungi pengurus RT/RW.';
           break;
         case 'auth/invalid-email':
-          showToast("Format email tidak valid.", "error");
+          msg = 'Format email tidak valid.';
           break;
         default:
-          showToast("Gagal login: " + error.message, "error");
+          msg = 'Gagal login: ' + error.message;
       }
+      setErrorMessage(msg);
+      showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -138,10 +143,17 @@ export const LoginScreen = ({ onLogin, showToast }) => {
   // --- ACTIVATION LOGIC ---
   const completeActivation = async (e) => {
     e.preventDefault();
-    if (password.length < 6) return showToast("Password minimal 6 karakter.", "error");
-    if (password !== confirmPassword) return showToast("Konfirmasi password tidak cocok.", "error");
+    if (password.length < 6) {
+      setErrorMessage('Password minimal 6 karakter.');
+      return showToast("Password minimal 6 karakter.", "error");
+    }
+    if (password !== confirmPassword) {
+      setErrorMessage('Konfirmasi password tidak cocok.');
+      return showToast("Konfirmasi password tidak cocok.", "error");
+    }
     
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -159,11 +171,17 @@ export const LoginScreen = ({ onLogin, showToast }) => {
       console.error("Activation Error:", error);
       
       if (error.code === 'auth/weak-password') {
-          showToast("Password terlalu lemah. Gunakan minimal 6 karakter.", "error");
+          const msg = 'Password terlalu lemah. Gunakan minimal 6 karakter.';
+          setErrorMessage(msg);
+          showToast(msg, 'error');
       } else if (error.code === 'auth/invalid-email') {
-          showToast("Format email tidak valid. Periksa kembali.", "error");
+          const msg = 'Format email tidak valid. Periksa kembali.';
+          setErrorMessage(msg);
+          showToast(msg, 'error');
       } else if (error.code === 'auth/too-many-requests') {
-          showToast("Terlalu banyak percobaan. Coba lagi nanti.", "error");
+          const msg = 'Terlalu banyak percobaan. Coba lagi nanti.';
+          setErrorMessage(msg);
+          showToast(msg, 'error');
       } else if (error.code === 'auth/email-already-in-use') {
           try {
               const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -177,14 +195,19 @@ export const LoginScreen = ({ onLogin, showToast }) => {
               onLogin({ ...residentData, uid: userCredential.user.uid, email, isProfileCompleted: true });
               return;
           } catch (loginErr) {
+              let msg = '';
               if (loginErr.code === 'auth/invalid-credential') {
-                  showToast("Email sudah terdaftar dengan password berbeda. Silakan login.", "error");
+                  msg = 'Email sudah terdaftar dengan password berbeda. Silakan gunakan password yang sesuai atau login langsung.';
               } else {
-                  showToast("Gagal aktivasi: Email sudah digunakan.", "error");
+                  msg = 'Gagal aktivasi: Email sudah digunakan.';
               }
+              setErrorMessage(msg);
+              showToast(msg, 'error');
           }
       } else {
-        showToast("Gagal aktivasi: " + error.message, "error");
+        const msg = 'Gagal aktivasi: ' + error.message;
+        setErrorMessage(msg);
+        showToast(msg, 'error');
       }
     } finally {
       setIsLoading(false);
@@ -291,7 +314,7 @@ export const LoginScreen = ({ onLogin, showToast }) => {
 
           {/* ==================== MODE: LOGIN ==================== */}
           {mode === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4 animate-fade-in">
+            <form onSubmit={(e) => { setErrorMessage(''); handleLogin(e); }} className="space-y-4 animate-fade-in">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Email</label>
                 <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
@@ -328,6 +351,17 @@ export const LoginScreen = ({ onLogin, showToast }) => {
                 </div>
               </div>
 
+              {/* Inline Error Alert */}
+              {errorMessage && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl animate-fade-in">
+                  <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold">Login Gagal</p>
+                    <p className="text-xs mt-0.5">{errorMessage}</p>
+                  </div>
+                </div>
+              )}
+
               <button type="submit" disabled={isLoading} className="w-full bg-emerald-600 text-white py-3.5 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:shadow-emerald-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4">
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "MASUK SEKARANG"}
               </button>
@@ -352,7 +386,7 @@ export const LoginScreen = ({ onLogin, showToast }) => {
 
           {/* ==================== MODE: ACTIVATE ==================== */}
           {mode === 'activate' && (
-            <form onSubmit={completeActivation} className="space-y-4 animate-fade-in">
+            <form onSubmit={(e) => { setErrorMessage(''); completeActivation(e); }} className="space-y-4 animate-fade-in">
               <div className="bg-emerald-50 p-4 rounded-2xl mb-4 border border-emerald-100">
                 <div className="flex items-center gap-3">
                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
@@ -383,34 +417,51 @@ export const LoginScreen = ({ onLogin, showToast }) => {
 
                 <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Buat Password</label>
-                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all relative">
                     <Lock className="w-5 h-5 text-gray-400 mr-3" />
                     <input 
-                        type="password" 
+                        type={showPass ? "text" : "password"}
                         value={password} 
                         onChange={e => setPassword(e.target.value)} 
                         placeholder="Minimal 6 karakter" 
                         className="bg-transparent w-full outline-none font-bold text-gray-800 text-sm" 
                         required 
                     />
+                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 text-gray-400">
+                      {showPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
+                    </button>
                     </div>
                 </div>
 
                 <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Konfirmasi Password</label>
-                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-2xl p-3.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all relative">
                     <Lock className="w-5 h-5 text-gray-400 mr-3" />
                     <input 
-                        type="password" 
+                        type={showConfirmPass ? "text" : "password"}
                         value={confirmPassword} 
                         onChange={e => setConfirmPassword(e.target.value)} 
                         placeholder="Ulangi password" 
                         className="bg-transparent w-full outline-none font-bold text-gray-800 text-sm" 
                         required 
                     />
+                    <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} className="absolute right-3 text-gray-400">
+                      {showConfirmPass ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
+                    </button>
                     </div>
                 </div>
               </div>
+
+              {/* Inline Error Alert */}
+              {errorMessage && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl animate-fade-in">
+                  <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold">Aktivasi Gagal</p>
+                    <p className="text-xs mt-0.5">{errorMessage}</p>
+                  </div>
+                </div>
+              )}
 
               <button type="submit" disabled={isLoading} className="w-full bg-emerald-600 text-white py-3.5 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4">
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "AKTIFKAN AKUN"}
