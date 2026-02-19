@@ -5,7 +5,6 @@ import {
   Plus,
   ChevronRight,
   X,
-  Sparkles,
   Loader2,
   FileCheck,
   Upload,
@@ -28,7 +27,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { db, APP_ID } from "../../config";
-import { callGeminiAPI, compressImage } from "../../utils";
+import { compressImage } from "../../utils";
 import { RecentReports } from "../dashboard";
 
 export const ReportScreen = ({ user, profile, showToast }) => {
@@ -37,7 +36,6 @@ export const ReportScreen = ({ user, profile, showToast }) => {
 
   // --- REPORT STATES ---
   const [desc, setDesc] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [images, setImages] = useState([]); // Array of { preview, base64 }
   const [isCompressing, setIsCompressing] = useState(false);
 
@@ -163,15 +161,7 @@ export const ReportScreen = ({ user, profile, showToast }) => {
     setIsSubmitting(false);
   };
 
-  const handleSmartDraft = async () => {
-    if (!desc.trim()) return;
-    setIsAnalyzing(true);
-    const prompt = `Perbaiki laporan ini agar formal: "${desc}"`;
-    const res = await callGeminiAPI(prompt, "Sekretaris profesional.");
-    setDesc(res);
-    setIsAnalyzing(false);
-    showToast("Laporan diperbaiki!", "success");
-  };
+
 
   // --- DYNAMIC PERMIT FORM LOGIC ---
   const PERMIT_TYPES = [
@@ -605,22 +595,7 @@ export const ReportScreen = ({ user, profile, showToast }) => {
                   )}
                 </div>
 
-                {desc.length > 5 && (
-                  <button
-                    onClick={handleSmartDraft}
-                    disabled={isAnalyzing}
-                    className="w-full text-xs font-bold text-purple-600 flex items-center justify-center gap-1 bg-purple-50 px-3 py-3 rounded-xl hover:bg-purple-100 transition-colors"
-                  >
-                    {isAnalyzing ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-3 h-3" />
-                    )}
-                    {isAnalyzing
-                      ? "Memperbaiki..."
-                      : "Perbaiki Tulisan dengan AI"}
-                  </button>
-                )}
+
                 <button
                   onClick={handleReportSubmit}
                   disabled={isSubmitting}
